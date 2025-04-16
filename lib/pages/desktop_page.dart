@@ -415,20 +415,126 @@ class _DesktopPageState extends State<DesktopPage> {
     });
   }
 
-  void handleSendQuery() {
+  void handleSendQuery() async {
+    if (queryController.text.isEmpty) return;
+
     setState(() {
-      responseMessage =
-          "This is a random response to your query: '${queryController.text}'";
-      queryController.clear();
+      responseMessage = "Generating response...";
     });
+
+    final url = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent?key=$_geminiApiKey',
+    );
+
+    final headers = {'Content-Type': 'application/json'};
+    final body = jsonEncode({
+      "contents": [
+        {
+          "parts": [
+            {
+              "text": """
+            Act as an expert code reviewer. Analyze the following query:
+
+            "${queryController.text}"
+
+            Provide your analysis in the following structured format:
+
+            ## Summary
+            [Brief summary of the query's context and purpose]
+
+            ## Key Insights
+            [List any key insights or recommendations]
+
+            ## Improvement Suggestions
+            [Provide specific suggestions for improvement]
+            """,
+            },
+          ],
+        },
+      ],
+    });
+
+    try {
+      final response = await http.post(url, headers: headers, body: body);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final responseText =
+            data['candidates']?[0]?['content']?['parts']?[0]?['text'];
+
+        setState(() {
+          responseMessage = responseText ?? "No analysis could be generated.";
+        });
+      } else {
+        setState(() {
+          responseMessage = "Error: ${response.statusCode}\n${response.body}";
+        });
+      }
+    } catch (error) {
+      setState(() {
+        responseMessage = "Error: $error";
+      });
+    } finally {
+      queryController.clear();
+    }
   }
 
-  void handleSendMessage() {
-    if (messageController.text.isNotEmpty) {
+  void handleSendMessage() async {
+    if (messageController.text.isEmpty) return;
+
+    final userMessage = messageController.text;
+    setState(() {
+      chatMessages.add("You: $userMessage");
+      messageController.clear();
+    });
+
+    final url = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent?key=$_geminiApiKey',
+    );
+
+    final headers = {'Content-Type': 'application/json'};
+    final body = jsonEncode({
+      "contents": [
+        {
+          "parts": [
+            {
+              "text": """
+          If the following message is a general query, respond in a helpful and conversational manner in Markdown format. 
+          If it is related to code debugging, provide a concise and relevant response in Markdown format. 
+          Do not include any unrelated content or logs.
+
+          Message: "$userMessage"
+
+          Respond appropriately based on the context of the message.
+          """,
+            },
+          ],
+        },
+      ],
+    });
+
+    try {
+      final response = await http.post(url, headers: headers, body: body);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final responseText =
+            data['candidates']?[0]?['content']?['parts']?[0]?['text'];
+
+        setState(() {
+          chatMessages.add(
+            // Instead of plain text, store a special marker for markdown rendering
+            "BotMarkdown: ${responseText ?? "I couldn't generate a response. Please try again."}",
+          );
+        });
+      } else {
+        setState(() {
+          chatMessages.add("Bot: Error: ${response.statusCode}");
+        });
+      }
+    } catch (error) {
       setState(() {
-        chatMessages.add("You: ${messageController.text}");
-        chatMessages.add("Bot: This is a random response to your query.");
-        messageController.clear();
+        chatMessages.add("Bot: Error: $error");
       });
     }
   }
@@ -1026,26 +1132,45 @@ class _DesktopPageState extends State<DesktopPage> {
             child: ListView.builder(
               itemCount: chatMessages.length,
               itemBuilder: (context, index) {
+                final msg = chatMessages[index];
+                final isUser = msg.startsWith("You:");
+                final isMarkdown = msg.startsWith("BotMarkdown:");
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
                   child: Align(
                     alignment:
-                        chatMessages[index].startsWith("You:")
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
+                        isUser ? Alignment.centerRight : Alignment.centerLeft,
                     child: Container(
                       padding: const EdgeInsets.all(12.0),
                       decoration: BoxDecoration(
                         color:
-                            chatMessages[index].startsWith("You:")
+                            isUser
                                 ? Colors.blue.shade700
                                 : Colors.grey.shade700,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        chatMessages[index],
-                        style: TextStyle(color: Colors.white),
-                      ),
+                      child:
+                          isMarkdown
+                              ? MarkdownBody(
+                                data: msg.replaceFirst("BotMarkdown: ", ""),
+                                styleSheet: MarkdownStyleSheet(
+                                  p: TextStyle(color: Colors.white),
+                                  code: TextStyle(
+                                    color: Colors.lightBlue,
+                                    fontSize: 14,
+                                    backgroundColor: Colors.black38,
+                                  ),
+                                  codeblockPadding: EdgeInsets.all(8),
+                                  codeblockDecoration: BoxDecoration(
+                                    color: Colors.black45,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                              )
+                              : Text(
+                                msg,
+                                style: TextStyle(color: Colors.white),
+                              ),
                     ),
                   ),
                 );
