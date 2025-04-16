@@ -29,6 +29,14 @@ class _DesktopPageState extends State<DesktopPage> {
   final String _geminiApiKey =
       'AIzaSyBlbhZsd6sxlQf1FbVZiYN6f3eJY6um1CE'; // Replace with your API key
 
+  bool showQueryField = false; // To toggle the query field
+  final TextEditingController queryController = TextEditingController();
+  String? responseMessage;
+
+  bool showChatbotUI = false; // To toggle the chatbot UI
+  final TextEditingController messageController = TextEditingController();
+  final List<String> chatMessages = []; // To store chat messages
+
   Future<void> _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles();
 
@@ -145,11 +153,17 @@ class _DesktopPageState extends State<DesktopPage> {
         final data = jsonDecode(response.body);
         final responseText =
             data['candidates']?[0]?['content']?['parts']?[0]?['text'];
-
-        setState(() {
-          codeReviewOutput = responseText ?? "No analysis could be generated.";
-          isTyping = true;
-        });
+        if (responseText == null) {
+          setState(() {
+            codeReviewOutput = "No analysis could be generated.";
+            isTyping = false;
+          });
+        } else {
+          setState(() {
+            codeReviewOutput = responseText ?? "No analysis could be generated.";
+            isTyping = true;
+          });
+        }
       } else {
         setState(() {
           codeReviewOutput = "Error: ${response.statusCode}\n${response.body}";
@@ -164,222 +178,272 @@ class _DesktopPageState extends State<DesktopPage> {
     }
   }
 
+  void handleCodeReviewTap() {
+    setState(() {
+      showChatbotUI = true;
+    });
+  }
+
+  void handleSendQuery() {
+    setState(() {
+      responseMessage = "This is a random response to your query: '${queryController.text}'";
+      queryController.clear();
+    });
+  }
+
+  void handleSendMessage() {
+    if (messageController.text.isNotEmpty) {
+      setState(() {
+        chatMessages.add("You: ${messageController.text}");
+        chatMessages.add("Bot: This is a random response to your query.");
+        messageController.clear();
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
       body: Row(
         children: [
-          ResponsiveDrawer(),
+          ResponsiveDrawer(
+            onCodeReviewTap: handleCodeReviewTap,
+            onDebugThisCodeForMeTap: () {},
+          ),
           Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(height: 200),
-                  Center(
-                    child: SizedBox(
-                      height: 400,
-                      width: 500,
-                      child: Scrollbar(
-                        child:
-                            fileContent == null
-                                ? Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text(
-                                      "Select Analysis Type:",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Expanded(
-                                      child: GridView.builder(
-                                        padding: const EdgeInsets.all(10.0),
-                                        gridDelegate:
-                                            const SliverGridDelegateWithFixedCrossAxisCount(
-                                              crossAxisCount: 2,
-                                              mainAxisSpacing: 10,
-                                              crossAxisSpacing: 10,
-                                              childAspectRatio: 2.5,
-                                            ),
-                                        itemCount: prompt.length,
-                                        itemBuilder: (context, index) {
-                                          final selected = prompt[index];
-                                          return GestureDetector(
-                                            onTap: () {
-                                              setState(() {
-                                                selectedAnalysisType = selected;
-                                              });
-                                            },
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                color:
-                                                    selectedAnalysisType ==
-                                                            selected
-                                                        ? Colors.blue.shade800
-                                                        : Colors.grey.shade800,
-                                                borderRadius:
-                                                    BorderRadius.circular(15),
-                                                border:
-                                                    selectedAnalysisType ==
-                                                            selected
-                                                        ? Border.all(
-                                                          color: Colors.white,
-                                                          width: 2,
-                                                        )
-                                                        : null,
-                                              ),
-                                              padding: const EdgeInsets.all(
-                                                8.0,
-                                              ),
-                                              child: Center(
-                                                child: Text(
-                                                  selected,
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 14,
-                                                  ),
-                                                  textAlign: TextAlign.center,
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                )
-                                : SingleChildScrollView(
-                                  padding: const EdgeInsets.all(10.0),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade800,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      fileContent!,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                      ),
-                    ),
-                  ),
-                  if (codeReviewOutput != null)
-                    Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade800,
-                          borderRadius: BorderRadius.circular(8),
+            child: Column(
+              children: [
+                // Header Section
+                Container(
+                  padding: const EdgeInsets.all(20.0),
+                  color: Colors.grey.shade900,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Dashboard',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
                         ),
-                        child:
-                            isTyping
-                                ? AnimatedTextKit(
-                                  animatedTexts: [
-                                    TyperAnimatedText(
-                                      codeReviewOutput!,
-                                      textStyle: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.notifications_outlined, color: Colors.white),
+                            onPressed: () {},
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.settings_outlined, color: Colors.white),
+                            onPressed: () {},
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Main Content
+                Expanded(
+                  child: showChatbotUI
+                      ? Container(
+                          padding: const EdgeInsets.all(16.0),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade800,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: ListView.builder(
+                                  itemCount: chatMessages.length,
+                                  itemBuilder: (context, index) {
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                      child: Align(
+                                        alignment: chatMessages[index].startsWith("You:")
+                                            ? Alignment.centerRight
+                                            : Alignment.centerLeft,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(12.0),
+                                          decoration: BoxDecoration(
+                                            color: chatMessages[index].startsWith("You:")
+                                                ? Colors.blue.shade700
+                                                : Colors.grey.shade700,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            chatMessages[index],
+                                            style: TextStyle(color: Colors.white),
+                                          ),
+                                        ),
                                       ),
-                                      speed: const Duration(milliseconds: 10),
-                                    ),
-                                  ],
-                                  isRepeatingAnimation: false,
-                                  onFinished: () {
-                                    setState(() {
-                                      isTyping = false;
-                                    });
+                                    );
                                   },
-                                )
-                                : MarkdownBody(
-                                  data: codeReviewOutput!,
-                                  styleSheet: MarkdownStyleSheet(
-                                    p: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                    ),
-                                    h1: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    h2: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    code: const TextStyle(
-                                      color: Colors.lightBlue,
-                                      fontSize: 14,
-                                      backgroundColor: Colors.black38,
-                                    ),
-                                    codeblockPadding: const EdgeInsets.all(8),
-                                    codeblockDecoration: BoxDecoration(
-                                      color: Colors.black45,
-                                      borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                              // Chat Input Section
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: messageController,
+                                      decoration: InputDecoration(
+                                        hintText: 'Type your message...',
+                                        hintStyle: TextStyle(color: Colors.grey.shade500),
+                                        filled: true,
+                                        fillColor: Colors.grey.shade900,
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                      ),
+                                      style: TextStyle(color: Colors.white),
                                     ),
                                   ),
-                                ),
-                      ),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 50.0,
-                      vertical: 15,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        OutlinedButton(
-                          style: ButtonStyle(
-                            padding: MaterialStateProperty.all(
-                              const EdgeInsets.symmetric(
-                                horizontal: 40,
-                                vertical: 20,
+                                  const SizedBox(width: 10),
+                                  ElevatedButton(
+                                    onPressed: handleSendMessage,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.blue.shade700,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: const Icon(Icons.send, color: Colors.white),
+                                  ),
+                                ],
                               ),
-                            ),
+                            ],
                           ),
-                          onPressed: _pickFile,
-                          child: const Text('Upload a File'),
+                        )
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Statistics Cards
+                              Row(
+                                children: [
+                                  _buildStatCard(
+                                    'Code Reviews',
+                                    '24',
+                                    Icons.code,
+                                    Colors.blue.shade700,
+                                  ),
+                                  const SizedBox(width: 16),
+                                  _buildStatCard(
+                                    'Debug Sessions',
+                                    '12',
+                                    Icons.bug_report,
+                                    Colors.green.shade700,
+                                  ),
+                                  const SizedBox(width: 16),
+                                  _buildStatCard(
+                                    'Git Reviews',
+                                    '8',
+                                    Icons.gite,
+                                    Colors.purple.shade700,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+                              // Recent Activity Section
+                              Text(
+                                'Recent Activity',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              _buildRecentActivityList(),
+                            ],
+                          ),
                         ),
-                        if (fileContent != null)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 20),
-                            child: OutlinedButton(
-                              style: ButtonStyle(
-                                padding: MaterialStateProperty.all(
-                                  const EdgeInsets.symmetric(
-                                    horizontal: 40,
-                                    vertical: 20,
-                                  ),
-                                ),
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  fileContent = null;
-                                  codeReviewOutput = null;
-                                });
-                              },
-                              child: const Text('New Analysis'),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade800,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Icon(icon, color: color),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentActivityList() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade800,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: NeverScrollableScrollPhysics(),
+        itemCount: 5,
+        separatorBuilder: (context, index) => Divider(
+          color: Colors.grey.shade700,
+          height: 1,
+        ),
+        itemBuilder: (context, index) {
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.blue.shade700,
+              child: Icon(Icons.code, color: Colors.white),
+            ),
+            title: Text(
+              'Code Review #${index + 1}',
+              style: TextStyle(color: Colors.white),
+            ),
+            subtitle: Text(
+              '2 hours ago',
+              style: TextStyle(color: Colors.grey.shade400),
+            ),
+            trailing: Icon(Icons.arrow_forward_ios, color: Colors.grey.shade500),
+          );
+        },
       ),
     );
   }
