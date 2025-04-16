@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 class ResponsiveDrawer extends StatelessWidget {
   final VoidCallback onCodeReviewTap;
   final VoidCallback onDebugThisCodeForMeTap;
+  final VoidCallback onGitRepoReviewTap;
 
   ResponsiveDrawer({
     super.key,
     required this.onCodeReviewTap,
     required this.onDebugThisCodeForMeTap,
+    required this.onGitRepoReviewTap,
   });
 
   @override
@@ -51,12 +53,18 @@ class ResponsiveDrawer extends StatelessWidget {
               ListTile(
                 title: Text('Code Review'),
                 onTap: onCodeReviewTap,
+                leading: Icon(Icons.code),
               ),
               ListTile(
                 title: Text('Debug this code for me'),
                 onTap: onDebugThisCodeForMeTap,
+                leading: Icon(Icons.bug_report),
               ),
-              Container(child: ListTile(title: Text('Git Repo review')))
+              ListTile(
+                title: Text('Git Repo Review'),
+                onTap: onGitRepoReviewTap, // Enable functionality
+                leading: Icon(Icons.gite_outlined),
+              ),
             ],
           ),
           Padding(
@@ -66,13 +74,11 @@ class ResponsiveDrawer extends StatelessWidget {
                 child: CircleAvatar(
                   radius: 25,
                   child: Image.network(
-                      'https://images6.alphacoders.com/130/1307179.jpeg'),
+                    'https://images6.alphacoders.com/130/1307179.jpeg',
+                  ),
                 ),
               ),
-              title: Text(
-                'Spy',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
+              title: Text('Spy', style: TextStyle(fontWeight: FontWeight.w600)),
               trailing: Icon(Icons.more_horiz),
             ),
           ),
