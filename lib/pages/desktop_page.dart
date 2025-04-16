@@ -1,4 +1,6 @@
 import 'package:code_tool/components/drawer.dart';
+import 'package:code_tool/pages/notifications.dart';
+import 'package:code_tool/pages/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
@@ -594,14 +596,23 @@ class _DesktopPageState extends State<DesktopPage> {
                               Icons.notifications_outlined,
                               color: Colors.white,
                             ),
-                            onPressed: () {},
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => NotificationPage(),
+                                ),
+                              );
+                            },
                           ),
                           IconButton(
                             icon: Icon(
                               Icons.settings_outlined,
                               color: Colors.white,
                             ),
-                            onPressed: () {},
+                            onPressed: () {
+                              Navigator.push(context, MaterialPageRoute(builder: (context)=> SettingsPage()));
+                            },
                           ),
                         ],
                       ),
