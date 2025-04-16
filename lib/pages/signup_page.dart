@@ -1,32 +1,35 @@
-import 'package:code_tool/pages/forgot_page.dart';
-import 'package:code_tool/pages/signup_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:code_tool/pages/desktop_page.dart'; // Import DesktopPage
 
-class DesktopLoginPage extends StatefulWidget {
-  const DesktopLoginPage({super.key});
+class SignUpPage extends StatefulWidget {
+  const SignUpPage({super.key});
 
   @override
-  State<DesktopLoginPage> createState() => _LoginState();
+  State<SignUpPage> createState() => _SignUpPageState();
 }
 
-class _LoginState extends State<DesktopLoginPage> with SingleTickerProviderStateMixin {
+class _SignUpPageState extends State<SignUpPage> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
+  final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _obscureText = true;
+  final TextEditingController _confirmPasswordController = TextEditingController();
+  
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  
-  // Add hover state variables
+
+  // Hover state variables
+  bool _isFullNameHovered = false;
   bool _isEmailHovered = false;
   bool _isPasswordHovered = false;
-  bool _isLoginButtonHovered = false;
+  bool _isConfirmPasswordHovered = false;
+  bool _isSignUpButtonHovered = false;
 
-  // Blue highlight color for hover effects
-  final Color _highlightColor = Color(0xFF2196F3); // Material blue
+  // Blue highlight color
+  final Color _highlightColor = Color(0xFF2196F3);
 
   @override
   void initState() {
@@ -46,48 +49,67 @@ class _LoginState extends State<DesktopLoginPage> with SingleTickerProviderState
 
   @override
   void dispose() {
+    _fullNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _animationController.dispose();
     super.dispose();
   }
 
-  void signIn(String email, String password) {
-    setState(() {
-      _isLoading = true;
-    });
-    
-    // Simulate network delay
-    Future.delayed(const Duration(seconds: 2), () {
+  void signUp() {
+    if (_formKey.currentState!.validate()) {
       setState(() {
-        _isLoading = false;
+        _isLoading = true;
       });
-      // Navigate to DesktopPage after successful login
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => DesktopPage()),
-      );
-    });
+
+      // Simulate network delay for sign up
+      Future.delayed(const Duration(seconds: 2), () {
+        setState(() {
+          _isLoading = false;
+        });
+        // Show success and navigate back
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Account created successfully! Please log in.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A), // Even darker black background
+      backgroundColor: const Color(0xFF0A0A0A),
       body: Row(
         children: [
-          // Left side with image or gradient
+          // Left side with gradient background
           Expanded(
             flex: 5,
             child: Container(
               decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage('assets/bg.jpg'), // Add your asset image here
-                  fit: BoxFit.cover,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF111111),
+                    Color(0xFF161616),
+                    Color(0xFF1A1A1A),
+                  ],
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: Offset(5, 0),
+                  ),
+                ],
               ),
               child: Center(
                 child: FadeTransition(
@@ -101,7 +123,7 @@ class _LoginState extends State<DesktopLoginPage> with SingleTickerProviderState
                       ),
                       SizedBox(height: 30),
                       Text(
-                        'Welcome Back',
+                        'Create Account',
                         style: GoogleFonts.poppins(
                           fontSize: 38,
                           fontWeight: FontWeight.bold,
@@ -113,7 +135,7 @@ class _LoginState extends State<DesktopLoginPage> with SingleTickerProviderState
                       Container(
                         width: screenWidth * 0.3,
                         child: Text(
-                          'Login to access your dashboard and continue your journey with us',
+                          'Join us today and start exploring our platform with full access',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.poppins(
                             fontSize: 16,
@@ -128,13 +150,13 @@ class _LoginState extends State<DesktopLoginPage> with SingleTickerProviderState
               ),
             ),
           ),
-          
-          // Right side with login form
+
+          // Right side with sign up form
           Expanded(
             flex: 4,
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
-              color: Color(0xFF0A0A0A), // Darkest black background
+              color: Color(0xFF0A0A0A),
               child: Center(
                 child: SingleChildScrollView(
                   child: FadeTransition(
@@ -147,8 +169,15 @@ class _LoginState extends State<DesktopLoginPage> with SingleTickerProviderState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
+                            // Back button
+                            IconButton(
+                              icon: Icon(Icons.arrow_back, color: Colors.white),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                            SizedBox(height: 20),
+                            
                             Text(
-                              'Sign In',
+                              'Sign Up',
                               style: GoogleFonts.poppins(
                                 fontSize: 32,
                                 fontWeight: FontWeight.bold,
@@ -158,7 +187,7 @@ class _LoginState extends State<DesktopLoginPage> with SingleTickerProviderState
                             ),
                             SizedBox(height: 12),
                             Text(
-                              'Please enter your credentials to continue',
+                              'Please fill in the details to create your account',
                               style: GoogleFonts.poppins(
                                 fontSize: 14,
                                 color: Colors.grey[500],
@@ -166,7 +195,61 @@ class _LoginState extends State<DesktopLoginPage> with SingleTickerProviderState
                               ),
                             ),
                             SizedBox(height: 40),
-                            
+
+                            // Full Name field
+                            Text(
+                              'Full Name',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey[300],
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            MouseRegion(
+                              onEnter: (_) => setState(() => _isFullNameHovered = true),
+                              onExit: (_) => setState(() => _isFullNameHovered = false),
+                              child: TextFormField(
+                                controller: _fullNameController,
+                                style: GoogleFonts.poppins(color: Colors.white),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please enter your full name';
+                                  }
+                                  return null;
+                                },
+                                decoration: InputDecoration(
+                                  hintText: 'John Doe',
+                                  hintStyle: GoogleFonts.poppins(color: Colors.grey[700]),
+                                  prefixIcon: Icon(Icons.person_outline, color: Colors.grey[600]),
+                                  filled: true,
+                                  fillColor: Color(0xFF141414),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: _highlightColor, width: 1.5),
+                                  ),
+                                  errorBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.redAccent.withOpacity(0.5), width: 1),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: _isFullNameHovered ? _highlightColor : Color(0xFF1A1A1A),
+                                      width: _isFullNameHovered ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  contentPadding: EdgeInsets.symmetric(vertical: 16),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 24),
+
                             // Email field
                             Text(
                               'Email Address',
@@ -195,14 +278,14 @@ class _LoginState extends State<DesktopLoginPage> with SingleTickerProviderState
                                   hintStyle: GoogleFonts.poppins(color: Colors.grey[700]),
                                   prefixIcon: Icon(Icons.email_outlined, color: Colors.grey[600]),
                                   filled: true,
-                                  fillColor: Color(0xFF141414), // Slightly lighter black
+                                  fillColor: Color(0xFF141414),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                     borderSide: BorderSide.none,
                                   ),
                                   focusedBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: _highlightColor, width: 1.5), // Blue focus border
+                                    borderSide: BorderSide(color: _highlightColor, width: 1.5),
                                   ),
                                   errorBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -211,16 +294,16 @@ class _LoginState extends State<DesktopLoginPage> with SingleTickerProviderState
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                     borderSide: BorderSide(
-                                      color: _isEmailHovered ? _highlightColor : Color(0xFF1A1A1A), 
-                                      width: _isEmailHovered ? 1.5 : 1
-                                    ), // Blue highlight on hover
+                                      color: _isEmailHovered ? _highlightColor : Color(0xFF1A1A1A),
+                                      width: _isEmailHovered ? 1.5 : 1,
+                                    ),
                                   ),
                                   contentPadding: EdgeInsets.symmetric(vertical: 16),
                                 ),
                               ),
                             ),
                             SizedBox(height: 24),
-                            
+
                             // Password field
                             Text(
                               'Password',
@@ -237,14 +320,13 @@ class _LoginState extends State<DesktopLoginPage> with SingleTickerProviderState
                               onExit: (_) => setState(() => _isPasswordHovered = false),
                               child: TextFormField(
                                 controller: _passwordController,
-                                obscureText: _obscureText,
+                                obscureText: _obscurePassword,
                                 style: GoogleFonts.poppins(color: Colors.white),
                                 validator: (value) {
-                                  if (value!.length <= 6) {
-                                    return 'Password should be greater than 6';
-                                  } else {
-                                    return null;
+                                  if (value == null || value.length <= 6) {
+                                    return 'Password should be greater than 6 characters';
                                   }
+                                  return null;
                                 },
                                 decoration: InputDecoration(
                                   hintText: '••••••••',
@@ -252,25 +334,25 @@ class _LoginState extends State<DesktopLoginPage> with SingleTickerProviderState
                                   prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[600]),
                                   suffixIcon: IconButton(
                                     icon: Icon(
-                                      _obscureText ? Icons.visibility_off : Icons.visibility,
+                                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
                                       color: Colors.grey[600],
                                       size: 20,
                                     ),
                                     onPressed: () {
                                       setState(() {
-                                        _obscureText = !_obscureText;
+                                        _obscurePassword = !_obscurePassword;
                                       });
                                     },
                                   ),
                                   filled: true,
-                                  fillColor: Color(0xFF141414), // Slightly lighter black
+                                  fillColor: Color(0xFF141414),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                     borderSide: BorderSide.none,
                                   ),
                                   focusedBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: _highlightColor, width: 1.5), // Blue focus border
+                                    borderSide: BorderSide(color: _highlightColor, width: 1.5),
                                   ),
                                   errorBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -279,79 +361,118 @@ class _LoginState extends State<DesktopLoginPage> with SingleTickerProviderState
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                     borderSide: BorderSide(
-                                      color: _isPasswordHovered ? _highlightColor : Color(0xFF1A1A1A), 
-                                      width: _isPasswordHovered ? 1.5 : 1
-                                    ), // Blue highlight on hover
+                                      color: _isPasswordHovered ? _highlightColor : Color(0xFF1A1A1A),
+                                      width: _isPasswordHovered ? 1.5 : 1,
+                                    ),
                                   ),
                                   contentPadding: EdgeInsets.symmetric(vertical: 16),
                                 ),
                               ),
                             ),
-                            
-                            // Forgot password
-                            Container(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: () {
-                                  // Navigate to forgot password page
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => ForgotPasswordPage()),
-                                  );
+                            SizedBox(height: 24),
+
+                            // Confirm Password field
+                            Text(
+                              'Confirm Password',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey[300],
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            MouseRegion(
+                              onEnter: (_) => setState(() => _isConfirmPasswordHovered = true),
+                              onExit: (_) => setState(() => _isConfirmPasswordHovered = false),
+                              child: TextFormField(
+                                controller: _confirmPasswordController,
+                                obscureText: _obscureConfirmPassword,
+                                style: GoogleFonts.poppins(color: Colors.white),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please confirm your password';
+                                  }
+                                  if (value != _passwordController.text) {
+                                    return 'Passwords don\'t match';
+                                  }
+                                  return null;
                                 },
-                                style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                ),
-                                child: Text(
-                                  'Forgot Password?',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 14,
-                                    color: Colors.grey[400],
-                                    fontWeight: FontWeight.w500,
+                                decoration: InputDecoration(
+                                  hintText: '••••••••',
+                                  hintStyle: GoogleFonts.poppins(color: Colors.grey[700]),
+                                  prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[600]),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                                      color: Colors.grey[600],
+                                      size: 20,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _obscureConfirmPassword = !_obscureConfirmPassword;
+                                      });
+                                    },
                                   ),
+                                  filled: true,
+                                  fillColor: Color(0xFF141414),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: _highlightColor, width: 1.5),
+                                  ),
+                                  errorBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.redAccent.withOpacity(0.5), width: 1),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: _isConfirmPasswordHovered ? _highlightColor : Color(0xFF1A1A1A),
+                                      width: _isConfirmPasswordHovered ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  contentPadding: EdgeInsets.symmetric(vertical: 16),
                                 ),
                               ),
                             ),
-                            SizedBox(height: 30),
-                            
-                            // Login button
+                            SizedBox(height: 40),
+
+                            // Sign Up button
                             MouseRegion(
-                              onEnter: (_) => setState(() => _isLoginButtonHovered = true),
-                              onExit: (_) => setState(() => _isLoginButtonHovered = false),
+                              onEnter: (_) => setState(() => _isSignUpButtonHovered = true),
+                              onExit: (_) => setState(() => _isSignUpButtonHovered = false),
                               child: SizedBox(
                                 width: double.infinity,
                                 height: 52,
                                 child: ElevatedButton(
-                                  onPressed: _isLoading 
-                                      ? null 
-                                      : () {
-                                          if (_formKey.currentState!.validate()) {
-                                            signIn(_emailController.text, _passwordController.text);
-                                          }
-                                        },
+                                  onPressed: _isLoading ? null : signUp,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Color(0xFF1A1A1A), // Dark gray button
+                                    backgroundColor: Color(0xFF1A1A1A),
                                     disabledBackgroundColor: Color(0xFF1A1A1A).withOpacity(0.6),
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       side: BorderSide(
-                                        color: _isLoginButtonHovered ? _highlightColor : Color(0xFF333333), 
-                                        width: _isLoginButtonHovered ? 1.5 : 1
-                                      ), // Blue highlight border on hover
+                                        color: _isSignUpButtonHovered ? _highlightColor : Color(0xFF333333),
+                                        width: _isSignUpButtonHovered ? 1.5 : 1,
+                                      ),
                                     ),
                                   ),
-                                  child: _isLoading 
+                                  child: _isLoading
                                       ? SizedBox(
-                                          height: 20, 
-                                          width: 20, 
+                                          height: 20,
+                                          width: 20,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 3,
                                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                           ),
                                         )
                                       : Text(
-                                          'Login',
+                                          'Create Account',
                                           style: GoogleFonts.poppins(
                                             fontSize: 16,
                                             fontWeight: FontWeight.w600,
@@ -362,29 +483,23 @@ class _LoginState extends State<DesktopLoginPage> with SingleTickerProviderState
                                 ),
                               ),
                             ),
-                            SizedBox(height: screenHeight * 0.05),
-                            
-                            // Sign up section
+                            SizedBox(height: screenHeight * 0.04),
+
+                            // Login link
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  'Not Having an Account?',
+                                  'Already have an account?',
                                   style: GoogleFonts.poppins(
                                     fontSize: 14,
                                     color: Colors.grey[500],
                                   ),
                                 ),
                                 TextButton(
-                                  onPressed: () {
-                                    // Navigate to sign up page
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => SignUpPage()),
-                                    );
-                                  },
+                                  onPressed: () => Navigator.pop(context),
                                   child: Text(
-                                    'Sign Up',
+                                    'Login',
                                     style: GoogleFonts.poppins(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
