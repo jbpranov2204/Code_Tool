@@ -500,12 +500,25 @@ class _DesktopPageState extends State<DesktopPage> {
             {
               "text": """
           If the following message is a general query, respond in a helpful and conversational manner in Markdown format. 
-          If it is related to code debugging, provide a concise and relevant response in Markdown format. 
-          Do not include any unrelated content or logs.
-
+          If it is related to code debugging or you're provided with code snippets, please:
+          
+          1. Format the code with proper indentation and alignment
+          2. Use appropriate syntax highlighting with triple backticks and language name
+          3. Organize the response with clear hierarchical headings
+          4. Break down complex solutions into step-by-step explanations
+          
+          For long code blocks:
+          - Restructure the code with consistent spacing (4 spaces for indentation)
+          - Align related elements vertically (like parameters, assignments, etc.)
+          - Add line breaks between logical sections
+          - Insert descriptive comments for complex logic
+          - Format method chains with one method per line when appropriate
+          - For very long lines, break them at logical points
+          - Ensure proper bracket alignment and placement
+          
           Message: "$userMessage"
-
-          Respond appropriately based on the context of the message.
+          
+          Respond appropriately based on the context of the message, focusing on clarity and readability.
           """,
             },
           ],
