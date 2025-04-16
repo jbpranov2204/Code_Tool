@@ -77,23 +77,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> with SingleTick
             flex: 5,
             child: Container(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF111111),
-                    Color(0xFF161616),
-                    Color(0xFF1A1A1A),
-                  ],
+                image: DecorationImage(
+                  image: AssetImage('assets/bg.jpg'), // Add your asset image here
+                  fit: BoxFit.cover,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 20,
-                    offset: Offset(5, 0),
-                  ),
-                ],
               ),
+              
               child: Center(
                 child: FadeTransition(
                   opacity: _fadeAnimation,
