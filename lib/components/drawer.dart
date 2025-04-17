@@ -4,12 +4,14 @@ class ResponsiveDrawer extends StatelessWidget {
   final VoidCallback onCodeReviewTap;
   final VoidCallback onDebugThisCodeForMeTap;
   final VoidCallback onGitRepoReviewTap;
+  final VoidCallback onDashboardTap;
 
   ResponsiveDrawer({
     super.key,
     required this.onCodeReviewTap,
     required this.onDebugThisCodeForMeTap,
     required this.onGitRepoReviewTap,
+    required this.onDashboardTap, // Add this parameter
   });
 
   @override
@@ -49,6 +51,11 @@ class ResponsiveDrawer extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              ListTile(
+                title: Text('Dashboard'),
+                onTap: onDashboardTap, // Update this line
+                leading: Icon(Icons.dashboard_customize),
               ),
               ListTile(
                 title: Text('Code Review'),

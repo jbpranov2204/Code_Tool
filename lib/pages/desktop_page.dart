@@ -564,6 +564,13 @@ class _DesktopPageState extends State<DesktopPage> {
             onCodeReviewTap: handleCodeReviewTap,
             onDebugThisCodeForMeTap: handleDebugThisCodeForMeTap,
             onGitRepoReviewTap: handleGitRepoReviewTap,
+            onDashboardTap: () {
+              setState(() {
+                showChatbotUI = false;
+                showGitReview = false;
+                showDebugPage = false;
+              });
+            }, // Add this callback
           ),
           Expanded(
             child: Column(
@@ -611,7 +618,12 @@ class _DesktopPageState extends State<DesktopPage> {
                               color: Colors.white,
                             ),
                             onPressed: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (context)=> SettingsPage()));
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => SettingsPage(),
+                                ),
+                              );
                             },
                           ),
                         ],
