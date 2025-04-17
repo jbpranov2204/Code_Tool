@@ -435,7 +435,7 @@ class _DesktopPageState extends State<DesktopPage>
       fileContent = null;
       codeReviewOutput = null;
     });
-    _pickFile();
+    // _pickFile(); - Removed automatic file picker call
   }
 
   void handleGitRepoReviewTap() {
