@@ -15,7 +15,8 @@ class DesktopPage extends StatefulWidget {
   _DesktopPageState createState() => _DesktopPageState();
 }
 
-class _DesktopPageState extends State<DesktopPage> {
+class _DesktopPageState extends State<DesktopPage>
+    with TickerProviderStateMixin {
   final List<String> prompt = [
     'Review this code for readability and best practices. Suggest improvements.',
     'Check this code for errors or logic issues and recommend fixes.',
@@ -53,6 +54,22 @@ class _DesktopPageState extends State<DesktopPage> {
       false; // Flag to control GitHub feature availability
 
   String selectedPage = ''; // Track the selected page
+
+  TabController? _repoTabController; // For desktop GitHub UI
+  TabController? _mobileRepoTabController; // For mobile GitHub UI
+
+  @override
+  void initState() {
+    super.initState();
+    // Will be initialized when repo files are loaded
+  }
+
+  @override
+  void dispose() {
+    _repoTabController?.dispose();
+    _mobileRepoTabController?.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles();
@@ -134,8 +151,9 @@ class _DesktopPageState extends State<DesktopPage> {
     final treeApiUrl =
         'https://api.github.com/repos/$owner/$repo/git/trees/$branch?recursive=1';
     final treeResp = await http.get(Uri.parse(treeApiUrl));
-    if (treeResp.statusCode != 200)
+    if (treeResp.statusCode != 200) {
       throw Exception("Could not fetch repo tree");
+    }
     final treeData = jsonDecode(treeResp.body);
 
     final List<String> files = [];
@@ -163,6 +181,10 @@ class _DesktopPageState extends State<DesktopPage> {
       _currentFileIndex = -1;
       fileContent = null;
       codeReviewOutput = null;
+      _repoTabController?.dispose();
+      _repoTabController = null;
+      _mobileRepoTabController?.dispose();
+      _mobileRepoTabController = null;
     });
 
     try {
@@ -179,6 +201,9 @@ class _DesktopPageState extends State<DesktopPage> {
         _repoFiles = files;
         _repoProcessStatus = "Repository loaded successfully!";
         _isProcessingRepo = false;
+        // Initialize tab controllers after files are loaded
+        _repoTabController = TabController(length: 2, vsync: this);
+        _mobileRepoTabController = TabController(length: 2, vsync: this);
       });
     } catch (error) {
       setState(() {
@@ -244,6 +269,10 @@ class _DesktopPageState extends State<DesktopPage> {
 
   Future<void> _analyzeRepositoryWithGemini() async {
     if (_repoName == null) return;
+
+    // Switch to Analysis tab (index 1) for both desktop and mobile
+    _repoTabController?.animateTo(1);
+    _mobileRepoTabController?.animateTo(1);
 
     setState(() {
       codeReviewOutput = "Analyzing entire repository...";
@@ -403,6 +432,8 @@ class _DesktopPageState extends State<DesktopPage> {
   void handleDebugThisCodeForMeTap() {
     setState(() {
       selectedPage = 'Debug';
+      fileContent = null;
+      codeReviewOutput = null;
     });
     _pickFile();
   }
@@ -410,12 +441,17 @@ class _DesktopPageState extends State<DesktopPage> {
   void handleGitRepoReviewTap() {
     setState(() {
       selectedPage = 'GitReview';
+      fileContent = null;
+      codeReviewOutput = null;
     });
   }
 
   void handleDashboardTap() {
     setState(() {
-      selectedPage = 'Dashboard';
+      // Change this to explicitly set 'Dashboard' when dashboard is selected
+      selectedPage = selectedPage == 'Dashboard' ? '' : 'Dashboard';
+      fileContent = null;
+      codeReviewOutput = null;
     });
   }
 
@@ -564,102 +600,785 @@ class _DesktopPageState extends State<DesktopPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Determine if we're on a mobile device based on screen width
+    final bool isMobile = MediaQuery.of(context).size.width < 768;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
-      body: Row(
-        children: [
-          ResponsiveDrawer(
-            onCodeReviewTap: handleCodeReviewTap,
-            onDebugThisCodeForMeTap: handleDebugThisCodeForMeTap,
-            onGitRepoReviewTap: handleGitRepoReviewTap,
-            onDashboardTap: handleDashboardTap,
-            onAtomImageTap: handleAtomImageTap, // Pass the new callback
-          ),
-          Expanded(
-            child:
-                selectedPage.isEmpty
-                    ? Center(
-                      child: Opacity(
-                        opacity: 0.5,
-                        child: Image.asset(
-                          'assets/Image/logo.png',
-                          fit: BoxFit.contain,
+      // Conditionally show AppBar for mobile only
+      appBar:
+          isMobile
+              ? AppBar(
+                backgroundColor: Colors.grey.shade900,
+                title: Text(
+                  selectedPage == 'GitReview'
+                      ? 'GitHub Repository Review'
+                      : selectedPage == 'Debug'
+                      ? 'Debug Code'
+                      : selectedPage == 'CodeReview'
+                      ? 'Code Review Chat'
+                      : selectedPage.isEmpty
+                      ? 'Code Tool'
+                      : 'Dashboard',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                actions: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.notifications_outlined,
+                      color: Colors.white,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => NotificationPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.settings_outlined, color: Colors.white),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => SettingsPage()),
+                      );
+                    },
+                  ),
+                ],
+              )
+              : null,
+      body: isMobile ? _buildMobileLayout() : _buildDesktopLayout(),
+      // Bottom navigation for mobile view
+      bottomNavigationBar:
+          isMobile
+              ? BottomNavigationBar(
+                backgroundColor: Colors.grey.shade900,
+                selectedItemColor: Colors.blue,
+                unselectedItemColor: Colors.grey,
+                currentIndex: _getSelectedIndex(), // -1 disables highlight
+                type:
+                    BottomNavigationBarType
+                        .fixed, // Add this to ensure all items are shown
+                onTap: (index) {
+                  switch (index) {
+                    case 0:
+                      handleDashboardTap();
+                      break;
+                    case 1:
+                      handleCodeReviewTap();
+                      break;
+                    case 2:
+                      handleDebugThisCodeForMeTap();
+                      break;
+                    case 3:
+                      handleGitRepoReviewTap();
+                      break;
+                  }
+                },
+                items: [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.dashboard),
+                    label: 'Dashboard',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.chat),
+                    label: 'Code Chat',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.bug_report),
+                    label: 'Debug',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.code),
+                    label: 'Git Review',
+                  ),
+                ],
+              )
+              : null,
+    );
+  }
+
+  // Get current index for the bottom navigation bar
+  int _getSelectedIndex() {
+    switch (selectedPage) {
+      case 'Dashboard':
+        return 0;
+      case 'CodeReview':
+        return 1;
+      case 'Debug':
+        return 2;
+      case 'GitReview':
+        return 3;
+      default:
+        // Return 0 instead of -1 to avoid assertion error in BottomNavigationBar
+        // and prevent crash. This will highlight Dashboard by default when nothing is selected.
+        // If you want no highlight, you must not show the BottomNavigationBar at all,
+        // or use a custom widget. Flutter's BottomNavigationBar does not support -1.
+        return 0;
+    }
+  }
+
+  // Desktop Layout with side drawer
+  Widget _buildDesktopLayout() {
+    return Row(
+      children: [
+        ResponsiveDrawer(
+          onCodeReviewTap: handleCodeReviewTap,
+          onDebugThisCodeForMeTap: handleDebugThisCodeForMeTap,
+          onGitRepoReviewTap: handleGitRepoReviewTap,
+          onDashboardTap: handleDashboardTap,
+          onAtomImageTap: handleAtomImageTap,
+          selectedPage: selectedPage, // Pass the selected page to drawer
+        ),
+        Expanded(
+          child:
+              selectedPage == 'Dashboard'
+                  ? _buildDashboard()
+                  : selectedPage.isEmpty
+                  ? Center(
+                    child: Opacity(
+                      opacity: 0.5,
+                      child: Image.asset(
+                        'assets/Image/logo.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  )
+                  : Column(
+                    children: [
+                      // Header Section
+                      Container(
+                        padding: const EdgeInsets.all(20.0),
+                        color: Colors.grey.shade900,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              selectedPage == 'GitReview'
+                                  ? 'GitHub Repository Review'
+                                  : selectedPage == 'Debug'
+                                  ? 'Debug Code'
+                                  : selectedPage == 'CodeReview'
+                                  ? 'Code Review Chat'
+                                  : '',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.notifications_outlined,
+                                    color: Colors.white,
+                                  ),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder:
+                                            (context) => NotificationPage(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.settings_outlined,
+                                    color: Colors.white,
+                                  ),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => SettingsPage(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                    )
-                    : Column(
-                      children: [
-                        // Header Section
-                        Container(
-                          padding: const EdgeInsets.all(20.0),
-                          color: Colors.grey.shade900,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                selectedPage == 'GitReview'
-                                    ? 'GitHub Repository Review'
-                                    : selectedPage == 'Debug'
-                                    ? 'Debug Code'
-                                    : selectedPage == 'CodeReview'
-                                    ? 'Code Review Chat'
-                                    : 'Dashboard',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
+                      // Main Content
+                      Expanded(
+                        child:
+                            selectedPage == 'GitReview'
+                                ? _buildGitHubUI()
+                                : selectedPage == 'Debug'
+                                ? _buildDebugPage()
+                                : selectedPage == 'CodeReview'
+                                ? _buildChatbotUI()
+                                : Container(), // Empty for any other case
+                      ),
+                    ],
+                  ),
+        ),
+      ],
+    );
+  }
+
+  // Mobile Layout without side drawer
+  Widget _buildMobileLayout() {
+    // Show dashboard directly when selectedPage is empty
+    return selectedPage.isEmpty
+        ? _buildMobileDashboard()
+        : selectedPage == 'GitReview'
+        ? _buildMobileGitHubUI()
+        : selectedPage == 'Debug'
+        ? _buildMobileDebugPage()
+        : selectedPage == 'CodeReview'
+        ? _buildChatbotUI() // Chatbot UI works well on mobile already
+        : selectedPage == 'Dashboard'
+        ? _buildMobileDashboard()
+        : Center(
+          child: Opacity(
+            opacity: 0.5,
+            child: Image.asset('assets/Image/logo.png', fit: BoxFit.contain),
+          ),
+        );
+  }
+
+  // Mobile version of GitHub UI
+  Widget _buildMobileGitHubUI() {
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _repoUrlController,
+            decoration: InputDecoration(
+              labelText: 'GitHub Repository URL',
+              labelStyle: TextStyle(color: Colors.white),
+              hintText: 'https://github.com/username/repository',
+              hintStyle: TextStyle(color: Colors.grey),
+              filled: true,
+              fillColor: Colors.grey.shade800,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              prefixIcon: Icon(Icons.link, color: Colors.grey),
+              suffixIcon: IconButton(
+                icon: Icon(Icons.clear, color: Colors.grey),
+                onPressed: () => _repoUrlController.clear(),
+              ),
+            ),
+            style: TextStyle(color: Colors.white),
+          ),
+          SizedBox(height: 16),
+
+          ElevatedButton.icon(
+            icon: Icon(Icons.cloud_download),
+            label: Text('Analyze Repository'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade700,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+              minimumSize: Size(double.infinity, 50),
+            ),
+            onPressed: _isProcessingRepo ? null : _processGitRepository,
+          ),
+
+          SizedBox(height: 16),
+
+          // Repository processing status
+          if (_isProcessingRepo || _repoProcessStatus != null)
+            Container(
+              padding: EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade800,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                children: [
+                  if (_isProcessingRepo)
+                    Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    ),
+                  SizedBox(height: 10),
+                  Text(
+                    _repoProcessStatus ?? '',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ],
+              ),
+            ),
+
+          if (_repoName != null && !_isProcessingRepo)
+            Container(
+              margin: EdgeInsets.symmetric(vertical: 15),
+              padding: EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade800,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Repository: $_repoName',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    'Files: ${_repoFiles.length}',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  SizedBox(height: 15),
+                  ElevatedButton.icon(
+                    icon: Icon(Icons.analytics),
+                    label: Text('Analyze Entire Repository'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade700,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      minimumSize: Size(double.infinity, 50),
+                    ),
+                    onPressed: _analyzeRepositoryWithGemini,
+                  ),
+                  SizedBox(height: 10),
+                  OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        _repoName = null;
+                        _repoFiles = [];
+                        _currentFileIndex = -1;
+                        fileContent = null;
+                        codeReviewOutput = null;
+                        _repoProcessStatus = null;
+                      });
+                    },
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Colors.grey),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      minimumSize: Size(double.infinity, 50),
+                    ),
+                    child: Text(
+                      'Clear Repository',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Files and analysis for mobile (stacked vertically)
+          if (_repoFiles.isNotEmpty)
+            Expanded(
+              child: Column(
+                children: [
+                  // Files list with horizontal scrolling
+                  Container(
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade900,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _repoFiles.length,
+                      itemBuilder: (context, index) {
+                        return InkWell(
+                          onTap: () => _loadRepositoryFile(index),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(horizontal: 16),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(
+                                  color:
+                                      index == _currentFileIndex
+                                          ? Colors.blue
+                                          : Colors.transparent,
+                                  width: 2,
                                 ),
                               ),
-                              Row(
-                                children: [
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.notifications_outlined,
-                                      color: Colors.white,
-                                    ),
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (context) => NotificationPage(),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.settings_outlined,
-                                      color: Colors.white,
-                                    ),
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => SettingsPage(),
-                                        ),
-                                      );
-                                    },
-                                  ),
+                            ),
+                            child: Text(
+                              _repoFiles[index].split('/').last,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight:
+                                    index == _currentFileIndex
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  SizedBox(height: 16),
+
+                  // Expandable sections for code and analysis
+                  Expanded(
+                    child: DefaultTabController(
+                      length: 2,
+                      initialIndex: _mobileRepoTabController?.index ?? 0,
+                      child: Builder(
+                        builder: (context) {
+                          // Attach controller if available
+                          if (_mobileRepoTabController != null) {
+                            DefaultTabController.of(
+                              context,
+                            )?.animation?.addListener(() {});
+                            DefaultTabController.of(context)?.index =
+                                _mobileRepoTabController!.index;
+                          }
+                          return Column(
+                            children: [
+                              TabBar(
+                                controller: _mobileRepoTabController,
+                                tabs: [
+                                  Tab(text: 'Code'),
+                                  Tab(text: 'Analysis'),
                                 ],
+                                labelColor: Colors.white,
+                                unselectedLabelColor: Colors.grey,
+                                indicatorColor: Colors.blue,
+                              ),
+                              Expanded(
+                                child: TabBarView(
+                                  controller: _mobileRepoTabController,
+                                  children: [
+                                    // Code Tab
+                                    Container(
+                                      padding: EdgeInsets.all(15),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade900,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: SingleChildScrollView(
+                                        child:
+                                            fileContent != null
+                                                ? SelectableText(
+                                                  fileContent!,
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontFamily: 'Courier',
+                                                    fontSize: 14,
+                                                  ),
+                                                )
+                                                : Center(
+                                                  child: Text(
+                                                    'Select a file to view its content',
+                                                    style: TextStyle(
+                                                      color: Colors.grey,
+                                                    ),
+                                                  ),
+                                                ),
+                                      ),
+                                    ),
+
+                                    // Analysis Tab
+                                    Container(
+                                      padding: EdgeInsets.all(15),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade900,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: SingleChildScrollView(
+                                        child:
+                                            codeReviewOutput != null
+                                                ? isTyping
+                                                    ? AnimatedTextKit(
+                                                      animatedTexts: [
+                                                        TyperAnimatedText(
+                                                          codeReviewOutput!,
+                                                          textStyle: TextStyle(
+                                                            color: Colors.white,
+                                                            fontSize: 14,
+                                                          ),
+                                                          speed: Duration(
+                                                            milliseconds: 10,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                      isRepeatingAnimation:
+                                                          false,
+                                                      onFinished: () {
+                                                        setState(() {
+                                                          isTyping = false;
+                                                        });
+                                                      },
+                                                    )
+                                                    : MarkdownBody(
+                                                      data: codeReviewOutput!,
+                                                      styleSheet: MarkdownStyleSheet(
+                                                        p: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 14,
+                                                        ),
+                                                        h1: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 20,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                        h2: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 18,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                        code: TextStyle(
+                                                          color:
+                                                              Colors.lightBlue,
+                                                          fontSize: 14,
+                                                          backgroundColor:
+                                                              Colors.black38,
+                                                        ),
+                                                        codeblockPadding:
+                                                            EdgeInsets.all(8),
+                                                        codeblockDecoration:
+                                                            BoxDecoration(
+                                                              color:
+                                                                  Colors
+                                                                      .black45,
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    4,
+                                                                  ),
+                                                            ),
+                                                      ),
+                                                    )
+                                                : Center(
+                                                  child: Text(
+                                                    'Analysis will appear here',
+                                                    style: TextStyle(
+                                                      color: Colors.grey,
+                                                    ),
+                                                  ),
+                                                ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
-                          ),
-                        ),
-                        // Main Content
-                        Expanded(
-                          child:
-                              selectedPage == 'GitReview'
-                                  ? _buildGitHubUI()
-                                  : selectedPage == 'Debug'
-                                  ? _buildDebugPage()
-                                  : selectedPage == 'CodeReview'
-                                  ? _buildChatbotUI()
-                                  : _buildDashboard(),
-                        ),
-                      ],
+                          );
+                        },
+                      ),
                     ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Mobile version of Debug page
+  Widget _buildMobileDebugPage() {
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ElevatedButton(
+            onPressed: _pickFile,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade700,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+              minimumSize: Size(double.infinity, 50),
+            ),
+            child: Text(
+              'Select File to Debug',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
           ),
+          SizedBox(height: 20),
+          if (fileContent != null)
+            Expanded(
+              child: DefaultTabController(
+                length: 2,
+                child: Column(
+                  children: [
+                    TabBar(
+                      tabs: [Tab(text: 'Code'), Tab(text: 'Analysis')],
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.grey,
+                      indicatorColor: Colors.blue,
+                    ),
+                    Expanded(
+                      child: TabBarView(
+                        children: [
+                          // Code Tab
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade900,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.grey.shade700),
+                            ),
+                            padding: EdgeInsets.all(15),
+                            margin: EdgeInsets.only(top: 10),
+                            child: SingleChildScrollView(
+                              child: SelectableText(
+                                fileContent!,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontFamily: 'Courier',
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // Analysis Tab
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade900,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.grey.shade700),
+                            ),
+                            padding: EdgeInsets.all(15),
+                            margin: EdgeInsets.only(top: 10),
+                            child: SingleChildScrollView(
+                              child:
+                                  codeReviewOutput != null
+                                      ? MarkdownBody(
+                                        data: codeReviewOutput!,
+                                        styleSheet: MarkdownStyleSheet(
+                                          p: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                          ),
+                                          h1: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          h2: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      )
+                                      : Center(
+                                        child: Text(
+                                          'Debug output will appear here',
+                                          style: TextStyle(color: Colors.grey),
+                                        ),
+                                      ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade800,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.code, size: 60, color: Colors.grey.shade600),
+                      SizedBox(height: 20),
+                      Text(
+                        'No file selected',
+                        style: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 18,
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        'Please select a code file to debug',
+                        style: TextStyle(color: Colors.grey.shade500),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Mobile version of Dashboard
+  Widget _buildMobileDashboard() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Statistics Cards for mobile (stacked)
+          _buildMobileStatCard(
+            'Code Reviews',
+            '24',
+            Icons.code,
+            Colors.blue.shade700,
+          ),
+          SizedBox(height: 12),
+          _buildMobileStatCard(
+            'Debug Sessions',
+            '12',
+            Icons.bug_report,
+            Colors.green.shade700,
+          ),
+          SizedBox(height: 12),
+          _buildMobileStatCard(
+            'Git Reviews',
+            '8',
+            Icons.code,
+            Colors.purple.shade700,
+          ),
+          SizedBox(height: 24),
+
+          // Recent Activity Section
+          Text(
+            'Recent Activity',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 16),
+          _buildRecentActivityList(),
         ],
       ),
     );
@@ -877,156 +1596,158 @@ class _DesktopPageState extends State<DesktopPage> {
 
                   // Code and analysis section
                   Expanded(
-                    child: Column(
-                      children: [
-                        Expanded(
-                          flex: 1,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade900,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.grey.shade700),
-                            ),
-                            padding: EdgeInsets.all(15),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Code',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                SizedBox(height: 10),
-                                Expanded(
-                                  child: SingleChildScrollView(
-                                    child:
-                                        fileContent != null
-                                            ? SelectableText(
-                                              fileContent!,
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontFamily: 'Courier',
-                                                fontSize: 14,
-                                              ),
-                                            )
-                                            : Center(
-                                              child: Text(
-                                                'Select a file from the list to see its content',
-                                                style: TextStyle(
-                                                  color: Colors.grey,
-                                                ),
-                                              ),
-                                            ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        SizedBox(height: 16),
-
-                        Expanded(
-                          flex: 1,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade900,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.grey.shade700),
-                            ),
-                            padding: EdgeInsets.all(15),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Analysis',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                SizedBox(height: 10),
-                                Expanded(
-                                  child: SingleChildScrollView(
-                                    child:
-                                        codeReviewOutput != null
-                                            ? isTyping
-                                                ? AnimatedTextKit(
-                                                  animatedTexts: [
-                                                    TyperAnimatedText(
-                                                      codeReviewOutput!,
-                                                      textStyle: TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 14,
-                                                      ),
-                                                      speed: Duration(
-                                                        milliseconds: 10,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                  isRepeatingAnimation: false,
-                                                  onFinished: () {
-                                                    setState(() {
-                                                      isTyping = false;
-                                                    });
-                                                  },
-                                                )
-                                                : MarkdownBody(
-                                                  data: codeReviewOutput!,
-                                                  styleSheet: MarkdownStyleSheet(
-                                                    p: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 14,
-                                                    ),
-                                                    h1: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 20,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                    h2: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 18,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                    code: TextStyle(
-                                                      color: Colors.lightBlue,
-                                                      fontSize: 14,
-                                                      backgroundColor:
-                                                          Colors.black38,
-                                                    ),
-                                                    codeblockPadding:
-                                                        EdgeInsets.all(8),
-                                                    codeblockDecoration:
-                                                        BoxDecoration(
-                                                          color: Colors.black45,
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                4,
-                                                              ),
-                                                        ),
+                    child: DefaultTabController(
+                      length: 2,
+                      initialIndex: _repoTabController?.index ?? 0,
+                      child: Builder(
+                        builder: (context) {
+                          // Attach controller if available
+                          if (_repoTabController != null) {
+                            DefaultTabController.of(
+                              context,
+                            )?.animation?.addListener(() {});
+                            DefaultTabController.of(context)?.index =
+                                _repoTabController!.index;
+                          }
+                          return Column(
+                            children: [
+                              TabBar(
+                                controller: _repoTabController,
+                                tabs: [
+                                  Tab(text: 'Code'),
+                                  Tab(text: 'Analysis'),
+                                ],
+                                labelColor: Colors.white,
+                                unselectedLabelColor: Colors.grey,
+                                indicatorColor: Colors.blue,
+                              ),
+                              Expanded(
+                                child: TabBarView(
+                                  controller: _repoTabController,
+                                  children: [
+                                    // Code Tab
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade900,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: Colors.grey.shade700,
+                                        ),
+                                      ),
+                                      padding: EdgeInsets.all(15),
+                                      child: SingleChildScrollView(
+                                        child:
+                                            fileContent != null
+                                                ? SelectableText(
+                                                  fileContent!,
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontFamily: 'Courier',
+                                                    fontSize: 14,
                                                   ),
                                                 )
-                                            : Center(
-                                              child: Text(
-                                                'Analysis will appear here',
-                                                style: TextStyle(
-                                                  color: Colors.grey,
+                                                : Center(
+                                                  child: Text(
+                                                    'Select a file from the list to see its content',
+                                                    style: TextStyle(
+                                                      color: Colors.grey,
+                                                    ),
+                                                  ),
                                                 ),
-                                              ),
-                                            ),
-                                  ),
+                                      ),
+                                    ),
+                                    // Analysis Tab
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade900,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: Colors.grey.shade700,
+                                        ),
+                                      ),
+                                      padding: EdgeInsets.all(15),
+                                      child: SingleChildScrollView(
+                                        child:
+                                            codeReviewOutput != null
+                                                ? isTyping
+                                                    ? AnimatedTextKit(
+                                                      animatedTexts: [
+                                                        TyperAnimatedText(
+                                                          codeReviewOutput!,
+                                                          textStyle: TextStyle(
+                                                            color: Colors.white,
+                                                            fontSize: 14,
+                                                          ),
+                                                          speed: Duration(
+                                                            milliseconds: 10,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                      isRepeatingAnimation:
+                                                          false,
+                                                      onFinished: () {
+                                                        setState(() {
+                                                          isTyping = false;
+                                                        });
+                                                      },
+                                                    )
+                                                    : MarkdownBody(
+                                                      data: codeReviewOutput!,
+                                                      styleSheet: MarkdownStyleSheet(
+                                                        p: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 14,
+                                                        ),
+                                                        h1: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 20,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                        h2: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 18,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                        code: TextStyle(
+                                                          color:
+                                                              Colors.lightBlue,
+                                                          fontSize: 14,
+                                                          backgroundColor:
+                                                              Colors.black38,
+                                                        ),
+                                                        codeblockPadding:
+                                                            EdgeInsets.all(8),
+                                                        codeblockDecoration:
+                                                            BoxDecoration(
+                                                              color:
+                                                                  Colors
+                                                                      .black45,
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    4,
+                                                                  ),
+                                                            ),
+                                                      ),
+                                                    )
+                                                : Center(
+                                                  child: Text(
+                                                    'Analysis will appear here',
+                                                    style: TextStyle(
+                                                      color: Colors.grey,
+                                                    ),
+                                                  ),
+                                                ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ],
@@ -1043,14 +1764,6 @@ class _DesktopPageState extends State<DesktopPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Debug Code',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
           SizedBox(height: 20),
           ElevatedButton(
             onPressed: _pickFile,
@@ -1193,6 +1906,9 @@ class _DesktopPageState extends State<DesktopPage> {
                         isUser ? Alignment.centerRight : Alignment.centerLeft,
                     child: Container(
                       padding: const EdgeInsets.all(12.0),
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.8,
+                      ),
                       decoration: BoxDecoration(
                         color:
                             isUser
@@ -1291,7 +2007,7 @@ class _DesktopPageState extends State<DesktopPage> {
               _buildStatCard(
                 'Git Reviews',
                 '8',
-                Icons.gite,
+                Icons.code,
                 Colors.purple.shade700,
               ),
             ],
@@ -1306,13 +2022,63 @@ class _DesktopPageState extends State<DesktopPage> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           _buildRecentActivityList(),
         ],
       ),
     );
   }
 
+  // Mobile stat card for dashboard
+  Widget _buildMobileStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade800,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.5), width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color),
+          ),
+          SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(color: Colors.grey.shade300, fontSize: 16),
+              ),
+              SizedBox(height: 4),
+              Text(
+                value,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Desktop stat card for dashboard
   Widget _buildStatCard(
     String title,
     String value,
@@ -1321,11 +2087,11 @@ class _DesktopPageState extends State<DesktopPage> {
   ) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.grey.shade800,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withOpacity(0.5), width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1335,21 +2101,24 @@ class _DesktopPageState extends State<DesktopPage> {
               children: [
                 Text(
                   title,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade300, fontSize: 16),
                 ),
-                Icon(icon, color: color),
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: color),
+                ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 10),
             Text(
               value,
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 24,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1359,35 +2128,71 @@ class _DesktopPageState extends State<DesktopPage> {
     );
   }
 
+  // Recent activity list for dashboard
   Widget _buildRecentActivityList() {
+    final activities = [
+      {
+        'icon': Icons.code,
+        'title': 'Code Review',
+        'description': 'Reviewed React component library',
+        'time': '2 hours ago',
+        'color': Colors.blue,
+      },
+      {
+        'icon': Icons.bug_report,
+        'title': 'Debug Session',
+        'description': 'Fixed memory leak in Python script',
+        'time': '4 hours ago',
+        'color': Colors.green,
+      },
+      {
+        'icon': Icons.code,
+        'title': 'Git Repository Review',
+        'description': 'Analyzed flutter_app_template repository',
+        'time': 'Yesterday',
+        'color': Colors.purple,
+      },
+    ];
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.grey.shade800,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: ListView.separated(
         shrinkWrap: true,
         physics: NeverScrollableScrollPhysics(),
-        itemCount: 5,
+        itemCount: activities.length,
         separatorBuilder:
             (context, index) => Divider(color: Colors.grey.shade700, height: 1),
         itemBuilder: (context, index) {
+          final activity = activities[index];
           return ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.blue.shade700,
-              child: Icon(Icons.code, color: Colors.white),
+            leading: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: (activity['color'] as Color).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                activity['icon'] as IconData,
+                color: activity['color'] as Color,
+              ),
             ),
             title: Text(
-              'Code Review #${index + 1}',
-              style: TextStyle(color: Colors.white),
+              activity['title'] as String,
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             subtitle: Text(
-              '2 hours ago',
+              activity['description'] as String,
               style: TextStyle(color: Colors.grey.shade400),
             ),
-            trailing: Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.grey.shade500,
+            trailing: Text(
+              activity['time'] as String,
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
             ),
           );
         },

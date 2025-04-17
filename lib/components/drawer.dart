@@ -13,7 +13,7 @@ class ResponsiveDrawer extends StatelessWidget {
     required this.onDebugThisCodeForMeTap,
     required this.onGitRepoReviewTap,
     required this.onDashboardTap,
-    required this.onAtomImageTap, // Initialize this parameter
+    required this.onAtomImageTap, required String selectedPage, // Initialize this parameter
   });
 
   @override
