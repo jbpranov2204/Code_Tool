@@ -52,6 +52,8 @@ class _DesktopPageState extends State<DesktopPage> {
   bool isGitHubFeatureEnabled =
       false; // Flag to control GitHub feature availability
 
+  String selectedPage = ''; // Track the selected page
+
   Future<void> _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles();
 
@@ -394,26 +396,26 @@ class _DesktopPageState extends State<DesktopPage> {
 
   void handleCodeReviewTap() {
     setState(() {
-      showChatbotUI = true;
-      showGitReview = false;
-      showDebugPage = false;
+      selectedPage = 'CodeReview';
     });
   }
 
   void handleDebugThisCodeForMeTap() {
     setState(() {
-      showDebugPage = true;
-      showChatbotUI = false;
-      showGitReview = false;
+      selectedPage = 'Debug';
     });
     _pickFile();
   }
 
   void handleGitRepoReviewTap() {
     setState(() {
-      showGitReview = true; // Navigate to GitHub functionalities UI
-      showChatbotUI = false;
-      showDebugPage = false;
+      selectedPage = 'GitReview';
+    });
+  }
+
+  void handleDashboardTap() {
+    setState(() {
+      selectedPage = 'Dashboard';
     });
   }
 
@@ -554,6 +556,12 @@ class _DesktopPageState extends State<DesktopPage> {
     }
   }
 
+  void handleAtomImageTap() {
+    setState(() {
+      selectedPage = ''; // Reset to show the transparent image
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -564,86 +572,93 @@ class _DesktopPageState extends State<DesktopPage> {
             onCodeReviewTap: handleCodeReviewTap,
             onDebugThisCodeForMeTap: handleDebugThisCodeForMeTap,
             onGitRepoReviewTap: handleGitRepoReviewTap,
-            onDashboardTap: () {
-              setState(() {
-                showChatbotUI = false;
-                showGitReview = false;
-                showDebugPage = false;
-              });
-            }, // Add this callback
+            onDashboardTap: handleDashboardTap,
+            onAtomImageTap: handleAtomImageTap, // Pass the new callback
           ),
           Expanded(
-            child: Column(
-              children: [
-                // Header Section
-                Container(
-                  padding: const EdgeInsets.all(20.0),
-                  color: Colors.grey.shade900,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        showGitReview
-                            ? 'GitHub Repository Review'
-                            : showDebugPage
-                            ? 'Debug Code'
-                            : showChatbotUI
-                            ? 'Code Review Chat'
-                            : 'Dashboard',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
+            child:
+                selectedPage.isEmpty
+                    ? Center(
+                      child: Opacity(
+                        opacity: 0.5,
+                        child: Image.asset(
+                          'assets/Image/logo.png',
+                          fit: BoxFit.contain,
                         ),
                       ),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.notifications_outlined,
-                              color: Colors.white,
-                            ),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => NotificationPage(),
+                    )
+                    : Column(
+                      children: [
+                        // Header Section
+                        Container(
+                          padding: const EdgeInsets.all(20.0),
+                          color: Colors.grey.shade900,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                selectedPage == 'GitReview'
+                                    ? 'GitHub Repository Review'
+                                    : selectedPage == 'Debug'
+                                    ? 'Debug Code'
+                                    : selectedPage == 'CodeReview'
+                                    ? 'Code Review Chat'
+                                    : 'Dashboard',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                              );
-                            },
+                              ),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.notifications_outlined,
+                                      color: Colors.white,
+                                    ),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) => NotificationPage(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.settings_outlined,
+                                      color: Colors.white,
+                                    ),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => SettingsPage(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            icon: Icon(
-                              Icons.settings_outlined,
-                              color: Colors.white,
-                            ),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => SettingsPage(),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                // Main Content
-                Expanded(
-                  child:
-                      showGitReview
-                          ? _buildGitHubUI()
-                          : showDebugPage
-                          ? _buildDebugPage()
-                          : showChatbotUI
-                          ? _buildChatbotUI()
-                          : _buildDashboard(),
-                ),
-              ],
-            ),
+                        ),
+                        // Main Content
+                        Expanded(
+                          child:
+                              selectedPage == 'GitReview'
+                                  ? _buildGitHubUI()
+                                  : selectedPage == 'Debug'
+                                  ? _buildDebugPage()
+                                  : selectedPage == 'CodeReview'
+                                  ? _buildChatbotUI()
+                                  : _buildDashboard(),
+                        ),
+                      ],
+                    ),
           ),
         ],
       ),

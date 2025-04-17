@@ -5,13 +5,15 @@ class ResponsiveDrawer extends StatelessWidget {
   final VoidCallback onDebugThisCodeForMeTap;
   final VoidCallback onGitRepoReviewTap;
   final VoidCallback onDashboardTap;
+  final VoidCallback onAtomImageTap; // Add this parameter
 
   ResponsiveDrawer({
     super.key,
     required this.onCodeReviewTap,
     required this.onDebugThisCodeForMeTap,
     required this.onGitRepoReviewTap,
-    required this.onDashboardTap, // Add this parameter
+    required this.onDashboardTap,
+    required this.onAtomImageTap, // Initialize this parameter
   });
 
   @override
@@ -37,7 +39,7 @@ class ResponsiveDrawer extends StatelessWidget {
                     ),
                     SizedBox(height: 30),
                     InkWell(
-                      onTap: () {},
+                      onTap: onAtomImageTap, // Call the new callback
                       child: Container(
                         height: 40,
                         width: 120,
