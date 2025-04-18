@@ -1,5 +1,4 @@
-import 'package:code_tool/pages/desktop_loginpage.dart';
-import 'package:code_tool/pages/desktop_page.dart';
+import 'package:code_tool/responsive/responsive.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -14,7 +13,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(brightness: Brightness.dark),
-      home: DesktopLoginPage(),
+      home: Responsive(),
     );
   }
 }
