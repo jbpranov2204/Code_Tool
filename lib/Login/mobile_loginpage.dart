@@ -1,8 +1,8 @@
-import 'package:code_tool/Forgotpassword/mobile_forgotpage.dart';
-import 'package:code_tool/SignUp/mobile_signuppage.dart';
+import 'package:atom/Forgotpassword/mobile_forgotpage.dart';
+import 'package:atom/SignUp/mobile_signuppage.dart';
+import 'package:atom/pages/desktop_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:code_tool/pages/desktop_page.dart';
 
 class MobileLoginPage extends StatefulWidget {
   const MobileLoginPage({super.key});

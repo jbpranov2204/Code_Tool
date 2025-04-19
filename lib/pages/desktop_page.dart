@@ -1,6 +1,6 @@
-import 'package:code_tool/components/drawer.dart';
-import 'package:code_tool/pages/notifications.dart';
-import 'package:code_tool/pages/settings.dart';
+import 'package:atom/components/drawer.dart';
+import 'package:atom/pages/notifications.dart';
+import 'package:atom/pages/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:convert';

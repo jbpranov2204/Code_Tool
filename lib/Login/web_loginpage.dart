@@ -1,8 +1,8 @@
-import 'package:code_tool/Forgotpassword/web_forgotpage.dart';
-import 'package:code_tool/SignUp/web_signuppage.dart';
+import 'package:atom/Forgotpassword/web_forgotpage.dart';
+import 'package:atom/SignUp/web_signuppage.dart';
+import 'package:atom/pages/desktop_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:code_tool/pages/desktop_page.dart';
 
 class WebLoginPage extends StatefulWidget {
   const WebLoginPage({super.key});

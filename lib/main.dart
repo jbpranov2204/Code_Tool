@@ -1,20 +1,18 @@
-import 'package:code_tool/pages/desktop_page.dart';
-import 'package:code_tool/responsive/responsive.dart';
+import 'package:atom/responsive/responsive.dart';
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(brightness: Brightness.dark),
-      home: DesktopPage(),
+      title: 'Code Tool',
+      theme: ThemeData.dark(),
+      home: Responsive(), // Set SplashScreen as the initial page
     );
   }
 }

@@ -1,5 +1,5 @@
-import 'package:code_tool/Login/mobile_loginpage.dart';
-import 'package:code_tool/Login/web_loginpage.dart';
+import 'package:atom/Login/mobile_loginpage.dart';
+import 'package:atom/Login/web_loginpage.dart';
 import 'package:flutter/material.dart';
 
 class Responsive extends StatelessWidget {
