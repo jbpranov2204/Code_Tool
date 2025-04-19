@@ -19,18 +19,11 @@ class DesktopPage extends StatefulWidget {
 
 class _DesktopPageState extends State<DesktopPage>
     with TickerProviderStateMixin {
-  final List<String> prompt = [
-    'Review this code for readability and best practices. Suggest improvements.',
-    'Check this code for errors or logic issues and recommend fixes.',
-    'Scan this code for security risks and suggest mitigations.',
-    'Analyze for performance bottlenecks and recommend optimizations.',
-  ];
-
   String? fileContent; // Variable to hold the file content
   String? codeReviewOutput; // Variable to hold API response
   bool isTyping = false;
-  String selectedAnalysisType =
-      'Review this code for readability and best practices. Suggest improvements.'; // Default analysis type
+  final String selectedAnalysisType =
+      'Thoroughly analyze this code for readability, best practices, errors, logic issues, security risks, and performance bottlenecks. Provide detailed improvement recommendations with examples.'; // Comprehensive fixed prompt
   final String _geminiApiKey =
       'AIzaSyBlbhZsd6sxlQf1FbVZiYN6f3eJY6um1CE'; // Replace with your API key
 
@@ -1293,40 +1286,28 @@ class _DesktopPageState extends State<DesktopPage>
             ),
           ),
 
-          // Analysis type dropdown
           SizedBox(height: 16),
+
+          // Instruction text instead of dropdown
           Container(
             width: double.infinity,
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            padding: EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.grey.shade800,
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.blue.withOpacity(0.3)),
             ),
-            child: DropdownButton<String>(
-              value: selectedAnalysisType,
-              dropdownColor: Colors.grey.shade800,
-              isExpanded: true,
-              underline: SizedBox(),
-              icon: Icon(Icons.arrow_drop_down, color: Colors.white),
-              style: TextStyle(color: Colors.white),
-              onChanged: (String? newValue) {
-                if (newValue != null) {
-                  setState(() {
-                    selectedAnalysisType = newValue;
-                    // Re-analyze if file content exists
-                    if (fileContent != null) {
-                      _analyzeCodeWithGemini(fileContent!, "Unknown.file");
-                    }
-                  });
-                }
-              },
-              items:
-                  prompt.map<DropdownMenuItem<String>>((String value) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value),
-                    );
-                  }).toList(),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue.shade300),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Files will be analyzed for readability, errors, security risks, and performance issues',
+                    style: TextStyle(color: Colors.white, fontSize: 14),
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -1531,28 +1512,6 @@ class _DesktopPageState extends State<DesktopPage>
                             color: Colors.grey.shade500,
                             fontSize: 16,
                           ),
-                        ),
-                      ),
-                      SizedBox(height: 30),
-                      ElevatedButton.icon(
-                        onPressed: () async {
-                          await _pickFile();
-                          setState(() {});
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.shade700,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
-                          ),
-                        ),
-                        icon: Icon(Icons.upload_file, color: Colors.white),
-                        label: Text(
-                          'Select File',
-                          style: TextStyle(color: Colors.white, fontSize: 16),
                         ),
                       ),
                     ],
