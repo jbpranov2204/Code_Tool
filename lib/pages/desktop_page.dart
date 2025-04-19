@@ -7,6 +7,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class DesktopPage extends StatefulWidget {
   DesktopPage({super.key});
@@ -72,22 +74,80 @@ class _DesktopPageState extends State<DesktopPage>
   }
 
   Future<void> _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: false,
+      );
 
-    if (result != null && result.files.isNotEmpty) {
-      final file = result.files.first;
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        final fileName = file.name;
 
-      if (file.bytes != null) {
-        setState(() {
-          fileContent = utf8.decode(file.bytes!);
-        });
-        await _analyzeCodeWithGemini(fileContent!, file.name ?? "Unknown file");
+        if (file.bytes != null && file.bytes!.isNotEmpty) {
+          // File has content in bytes (common for web and some mobile platforms)
+          setState(() {
+            fileContent = utf8.decode(file.bytes!);
+          });
+          await _analyzeCodeWithGemini(fileContent!, fileName);
+        } else if (file.path != null && file.path!.isNotEmpty) {
+          // For platforms where we have a file path but not bytes
+          try {
+            // Using dart:io File for reading instead of http.get
+            // This works correctly on Android, iOS, and desktop platforms
+            final fileData = await File(file.path!).readAsBytes();
+            setState(() {
+              fileContent = utf8.decode(fileData);
+            });
+            await _analyzeCodeWithGemini(fileContent!, fileName);
+          } catch (e) {
+            // If direct File reading fails, try alternative methods based on platform
+            if (Platform.isAndroid) {
+              // For Android, try using platform-specific path handling
+              try {
+                final pathSegments = file.path!.split('/');
+                final name = pathSegments.last;
+                final dir = await getApplicationDocumentsDirectory();
+                final tempPath = '${dir.path}/$name';
+
+                // Copy the file to a location we can access
+                await File(tempPath).writeAsBytes(
+                  await File(file.path!).readAsBytes(),
+                  flush: true,
+                );
+
+                final fileData = await File(tempPath).readAsBytes();
+                setState(() {
+                  fileContent = utf8.decode(fileData);
+                });
+                await _analyzeCodeWithGemini(fileContent!, fileName);
+              } catch (androidError) {
+                _showErrorSnackbar('Error reading Android file: $androidError');
+              }
+            } else {
+              _showErrorSnackbar('Error reading file: $e');
+            }
+          }
+        } else {
+          _showErrorSnackbar('File appears to be empty or inaccessible');
+        }
       } else {
-        print("No bytes available for the selected file.");
+        print("No file selected");
       }
-    } else {
-      print("No file selected");
+    } catch (e) {
+      _showErrorSnackbar('Error selecting file: $e');
     }
+  }
+
+  // Helper method for showing error messages
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   String _guessLanguageFromFilename(String filename) {
@@ -1205,8 +1265,13 @@ class _DesktopPageState extends State<DesktopPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Improved file selection button with better feedback
           ElevatedButton(
-            onPressed: _pickFile,
+            onPressed: () async {
+              await _pickFile();
+              // Force UI refresh after file is picked
+              setState(() {});
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue.shade700,
               shape: RoundedRectangleBorder(
@@ -1215,12 +1280,59 @@ class _DesktopPageState extends State<DesktopPage>
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
               minimumSize: Size(double.infinity, 50),
             ),
-            child: Text(
-              'Select File to Debug',
-              style: TextStyle(color: Colors.white, fontSize: 16),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.attach_file, color: Colors.white),
+                SizedBox(width: 8),
+                Text(
+                  'Select File to Debug',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              ],
             ),
           ),
+
+          // Analysis type dropdown
+          SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade800,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: DropdownButton<String>(
+              value: selectedAnalysisType,
+              dropdownColor: Colors.grey.shade800,
+              isExpanded: true,
+              underline: SizedBox(),
+              icon: Icon(Icons.arrow_drop_down, color: Colors.white),
+              style: TextStyle(color: Colors.white),
+              onChanged: (String? newValue) {
+                if (newValue != null) {
+                  setState(() {
+                    selectedAnalysisType = newValue;
+                    // Re-analyze if file content exists
+                    if (fileContent != null) {
+                      _analyzeCodeWithGemini(fileContent!, "Unknown.file");
+                    }
+                  });
+                }
+              },
+              items:
+                  prompt.map<DropdownMenuItem<String>>((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+            ),
+          ),
+
           SizedBox(height: 20),
+
+          // Conditional display based on file content
           if (fileContent != null)
             Expanded(
               child: DefaultTabController(
@@ -1269,29 +1381,110 @@ class _DesktopPageState extends State<DesktopPage>
                             child: SingleChildScrollView(
                               child:
                                   codeReviewOutput != null
-                                      ? MarkdownBody(
-                                        data: codeReviewOutput!,
-                                        styleSheet: MarkdownStyleSheet(
-                                          p: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 14,
-                                          ),
-                                          h1: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          h2: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      )
+                                      ? isTyping
+                                          ? Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  SizedBox(
+                                                    width: 20,
+                                                    height: 20,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                          color: Colors.blue,
+                                                        ),
+                                                  ),
+                                                  SizedBox(width: 10),
+                                                  Text(
+                                                    'Analyzing code...',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              SizedBox(height: 16),
+                                              AnimatedTextKit(
+                                                animatedTexts: [
+                                                  TyperAnimatedText(
+                                                    codeReviewOutput!,
+                                                    textStyle: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 14,
+                                                    ),
+                                                    speed: Duration(
+                                                      milliseconds: 10,
+                                                    ),
+                                                  ),
+                                                ],
+                                                isRepeatingAnimation: false,
+                                                onFinished: () {
+                                                  setState(() {
+                                                    isTyping = false;
+                                                  });
+                                                },
+                                              ),
+                                            ],
+                                          )
+                                          : MarkdownBody(
+                                            data: codeReviewOutput!,
+                                            styleSheet: MarkdownStyleSheet(
+                                              p: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 14,
+                                              ),
+                                              h1: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              h2: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              code: TextStyle(
+                                                color: Colors.lightBlue,
+                                                fontSize: 14,
+                                                backgroundColor: Colors.black38,
+                                              ),
+                                              codeblockPadding: EdgeInsets.all(
+                                                8,
+                                              ),
+                                              codeblockDecoration:
+                                                  BoxDecoration(
+                                                    color: Colors.black45,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          4,
+                                                        ),
+                                                  ),
+                                            ),
+                                          )
                                       : Center(
-                                        child: Text(
-                                          'Debug output will appear here',
-                                          style: TextStyle(color: Colors.grey),
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.sentiment_neutral,
+                                              color: Colors.grey.shade600,
+                                              size: 48,
+                                            ),
+                                            SizedBox(height: 16),
+                                            Text(
+                                              'Select a file to analyze',
+                                              style: TextStyle(
+                                                color: Colors.grey.shade400,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                             ),
@@ -1314,19 +1507,53 @@ class _DesktopPageState extends State<DesktopPage>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.code, size: 60, color: Colors.grey.shade600),
+                      Icon(
+                        Icons.upload_file,
+                        size: 70,
+                        color: Colors.grey.shade600,
+                      ),
                       SizedBox(height: 20),
                       Text(
                         'No file selected',
                         style: TextStyle(
                           color: Colors.grey.shade400,
-                          fontSize: 18,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       SizedBox(height: 10),
-                      Text(
-                        'Please select a code file to debug',
-                        style: TextStyle(color: Colors.grey.shade500),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 40),
+                        child: Text(
+                          'Tap the button above to select a code file for analysis',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 30),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          await _pickFile();
+                          setState(() {});
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade700,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                        ),
+                        icon: Icon(Icons.upload_file, color: Colors.white),
+                        label: Text(
+                          'Select File',
+                          style: TextStyle(color: Colors.white, fontSize: 16),
+                        ),
                       ),
                     ],
                   ),

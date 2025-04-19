@@ -1,3 +1,4 @@
+import 'package:code_tool/pages/desktop_page.dart';
 import 'package:code_tool/responsive/responsive.dart';
 import 'package:flutter/material.dart';
 
@@ -13,7 +14,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(brightness: Brightness.dark),
-      home: Responsive(),
+      home: DesktopPage(),
     );
   }
 }
