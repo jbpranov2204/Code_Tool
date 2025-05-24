@@ -53,6 +53,13 @@ class _DesktopPageState extends State<DesktopPage>
   TabController? _repoTabController; // For desktop GitHub UI
   TabController? _mobileRepoTabController; // For mobile GitHub UI
 
+  // GitHub login related variables
+  bool _isLoggedInToGitHub = false;
+  String? _githubUsername;
+  String? _githubToken; // Changed back to token instead of password
+  List<Map<String, dynamic>> _userRepos = [];
+  bool _isLoadingRepos = false;
+
   @override
   void initState() {
     super.initState();
@@ -476,6 +483,298 @@ class _DesktopPageState extends State<DesktopPage>
     }
   }
 
+  // GitHub login dialog
+  Future<void> _showGitHubLoginDialog() async {
+    final usernameController = TextEditingController();
+    final tokenController =
+        TextEditingController(); // Changed back from passwordController
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('GitHub Login', style: TextStyle(color: Colors.white)),
+          backgroundColor: Colors.grey.shade900,
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: usernameController,
+                  decoration: InputDecoration(
+                    labelText: 'GitHub Username',
+                    labelStyle: TextStyle(color: Colors.white),
+                    hintStyle: TextStyle(color: Colors.grey),
+                    filled: true,
+                    fillColor: Colors.grey.shade800,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  style: TextStyle(color: Colors.white),
+                ),
+                SizedBox(height: 16),
+                TextField(
+                  controller: tokenController,
+                  decoration: InputDecoration(
+                    labelText: 'Personal Access Token',
+                    labelStyle: TextStyle(color: Colors.white),
+                    hintText: 'Required for API access',
+                    hintStyle: TextStyle(color: Colors.grey),
+                    filled: true,
+                    fillColor: Colors.grey.shade800,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  style: TextStyle(color: Colors.white),
+                  obscureText: true,
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'GitHub requires a Personal Access Token for API access. Create one at GitHub > Settings > Developer settings > Personal access tokens.',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Cancel', style: TextStyle(color: Colors.grey)),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            ElevatedButton(
+              child: Text('Login'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade700,
+              ),
+              onPressed: () {
+                setState(() {
+                  _githubUsername = usernameController.text;
+                  _githubToken =
+                      tokenController.text.isNotEmpty
+                          ? tokenController.text
+                          : null;
+                  _isLoggedInToGitHub = true;
+                });
+                Navigator.of(context).pop();
+                _fetchUserRepositories();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Fetch user repositories
+  Future<void> _fetchUserRepositories() async {
+    if (_githubUsername == null) return;
+
+    setState(() {
+      _isLoadingRepos = true;
+      _userRepos = [];
+    });
+
+    try {
+      // If token is provided, we'll fetch all accessible repositories
+      if (_githubToken != null && _githubToken!.isNotEmpty) {
+        await _fetchAllAccessibleRepositories();
+      } else {
+        // Without token, we can only get public repositories of the user
+        await _fetchPublicRepositories();
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingRepos = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error fetching repositories: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  // Fetch all repositories the user can access (requires token)
+  Future<void> _fetchAllAccessibleRepositories() async {
+    final userReposUrl = Uri.parse(
+      'https://api.github.com/user/repos?per_page=100&sort=updated',
+    );
+
+    final headers = <String, String>{
+      'Accept': 'application/vnd.github.v3+json',
+      'Authorization': 'token $_githubToken', // Using token authentication
+    };
+
+    final List<Map<String, dynamic>> allRepos = [];
+
+    try {
+      // Fetch user's own repositories
+      final userReposResponse = await http.get(userReposUrl, headers: headers);
+
+      if (userReposResponse.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(userReposResponse.body);
+
+        // Process each repository
+        for (var repo in data) {
+          allRepos.add({
+            'name': repo['name'],
+            'full_name': repo['full_name'],
+            'description': repo['description'],
+            'url': repo['html_url'],
+            'stars': repo['stargazers_count'],
+            'forks': repo['forks_count'],
+            'private': repo['private'],
+            'owner': repo['owner']?['login'] ?? '',
+            'isOrg': false,
+          });
+        }
+      } else {
+        // Authentication failed
+        throw Exception(
+          'Authentication failed. Please check your Personal Access Token.',
+        );
+      }
+
+      // Now also fetch repositories from organizations the user belongs to
+      final orgsUrl = Uri.parse('https://api.github.com/user/orgs');
+      final orgsResponse = await http.get(orgsUrl, headers: headers);
+
+      if (orgsResponse.statusCode == 200) {
+        final List<dynamic> orgs = jsonDecode(orgsResponse.body);
+
+        // For each organization, fetch its repositories
+        for (var org in orgs) {
+          final orgLogin = org['login'];
+          final orgReposUrl = Uri.parse(
+            'https://api.github.com/orgs/$orgLogin/repos?per_page=100',
+          );
+
+          final orgReposResponse = await http.get(
+            orgReposUrl,
+            headers: headers,
+          );
+
+          if (orgReposResponse.statusCode == 200) {
+            final List<dynamic> orgRepos = jsonDecode(orgReposResponse.body);
+
+            for (var repo in orgRepos) {
+              // Only add repos that the user can push to (has write access)
+              if (repo['permissions']?['push'] == true) {
+                allRepos.add({
+                  'name': repo['name'],
+                  'full_name': repo['full_name'],
+                  'description': repo['description'],
+                  'url': repo['html_url'],
+                  'stars': repo['stargazers_count'],
+                  'forks': repo['forks_count'],
+                  'private': repo['private'],
+                  'owner': orgLogin,
+                  'isOrg': true,
+                });
+              }
+            }
+          }
+        }
+      }
+
+      // Sort all repositories by most recently updated
+      allRepos.sort((a, b) {
+        // You would need to add 'updated_at' to the repo data to sort by that
+        // For now, sort by stars as a proxy for importance
+        return (b['stars'] as int).compareTo(a['stars'] as int);
+      });
+
+      setState(() {
+        _userRepos = allRepos;
+        _isLoadingRepos = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingRepos = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Error: $e\nMake sure your Personal Access Token has the correct permissions.',
+          ),
+          backgroundColor: Colors.red.shade700,
+          duration: Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+
+  // Fetch only public repositories of a user
+  Future<void> _fetchPublicRepositories() async {
+    final url = Uri.parse(
+      'https://api.github.com/users/$_githubUsername/repos?per_page=100&sort=updated',
+    );
+
+    final headers = <String, String>{
+      'Accept': 'application/vnd.github.v3+json',
+      // Include token auth header if we have token
+      if (_githubToken != null && _githubToken!.isNotEmpty)
+        'Authorization': 'token $_githubToken',
+    };
+
+    try {
+      final response = await http.get(url, headers: headers);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _userRepos =
+              data
+                  .map(
+                    (repo) => {
+                      'name': repo['name'],
+                      'full_name': repo['full_name'],
+                      'description': repo['description'],
+                      'url': repo['html_url'],
+                      'stars': repo['stargazers_count'],
+                      'forks': repo['forks_count'],
+                      'private': repo['private'] ?? false,
+                      'owner': repo['owner']?['login'] ?? '',
+                      'isOrg': false,
+                    },
+                  )
+                  .toList();
+          _isLoadingRepos = false;
+        });
+      } else {
+        throw Exception(
+          'Failed to load public repositories: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error fetching repositories: $e');
+    }
+  }
+
+  // Select a repository to analyze
+  void _selectRepository(String repoFullName) {
+    _repoUrlController.text = 'https://github.com/$repoFullName';
+    _processGitRepository();
+  }
+
+  // Logout from GitHub
+  void _logoutFromGitHub() {
+    setState(() {
+      _isLoggedInToGitHub = false;
+      _githubUsername = null;
+      _githubToken = null;
+      _userRepos = [];
+    });
+  }
+
   void handleCodeReviewTap() {
     setState(() {
       selectedPage = 'CodeReview';
@@ -554,7 +853,6 @@ class _DesktopPageState extends State<DesktopPage>
         final data = jsonDecode(response.body);
         final responseText =
             data['candidates']?[0]?['content']?['parts']?[0]?['text'];
-
         setState(() {
           responseMessage = responseText ?? "No analysis could be generated.";
         });
@@ -930,21 +1228,192 @@ class _DesktopPageState extends State<DesktopPage>
           ),
           SizedBox(height: 16),
 
-          ElevatedButton.icon(
-            icon: Icon(Icons.cloud_download),
-            label: Text('Analyze Repository'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade700,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  icon: Icon(Icons.cloud_download),
+                  label: Text('Analyze Repository'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade700,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+                  ),
+                  onPressed: _isProcessingRepo ? null : _processGitRepository,
+                ),
               ),
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              minimumSize: Size(double.infinity, 50),
-            ),
-            onPressed: _isProcessingRepo ? null : _processGitRepository,
+              SizedBox(width: 10),
+              Expanded(
+                flex: 1,
+                child: ElevatedButton.icon(
+                  icon: Icon(
+                    _isLoggedInToGitHub ? Icons.logout : Icons.login,
+                    size: 16,
+                  ),
+                  label: Text('GitHub', style: TextStyle(fontSize: 13)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey.shade800,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 15),
+                  ),
+                  onPressed:
+                      _isLoggedInToGitHub
+                          ? _logoutFromGitHub
+                          : _showGitHubLoginDialog,
+                ),
+              ),
+            ],
           ),
 
-          SizedBox(height: 16),
+          // User repositories section (when logged in)
+          if (_isLoggedInToGitHub && _userRepos.isNotEmpty)
+            Container(
+              margin: EdgeInsets.only(top: 20),
+              padding: EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade800,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Your Repositories (tap to select)',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  SizedBox(height: 15),
+                  Container(
+                    height: 200,
+                    child: ListView.builder(
+                      itemCount: _userRepos.length,
+                      itemBuilder: (context, index) {
+                        final repo = _userRepos[index];
+                        return ListTile(
+                          title: Row(
+                            children: [
+                              Text(
+                                repo['name'],
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              if (repo['private'] == true)
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade700,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'Private',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
+                              if (repo['isOrg'] == true)
+                                Container(
+                                  margin: EdgeInsets.only(left: 4),
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.purple.shade800,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'Org',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (repo['owner'] != _githubUsername &&
+                                  !repo['isOrg'])
+                                Padding(
+                                  padding: EdgeInsets.only(bottom: 2),
+                                  child: Text(
+                                    'Forked from: ${repo['owner']}',
+                                    style: TextStyle(
+                                      color: Colors.blue.shade300,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              Text(
+                                repo['description'] ?? 'No description',
+                                style: TextStyle(color: Colors.grey.shade400),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.star, color: Colors.amber, size: 16),
+                              Text(
+                                ' ${repo['stars']} ',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              Icon(
+                                Icons.fork_right,
+                                color: Colors.blue,
+                                size: 16,
+                              ),
+                              Text(
+                                ' ${repo['forks']}',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ],
+                          ),
+                          onTap: () => _selectRepository(repo['full_name']),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          if (_isLoggedInToGitHub && _isLoadingRepos)
+            Container(
+              margin: EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Column(
+                  children: [
+                    CircularProgressIndicator(color: Colors.white),
+                    SizedBox(height: 10),
+                    Text(
+                      'Loading repositories...',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
           // Repository processing status
           if (_isProcessingRepo || _repoProcessStatus != null)
@@ -1569,7 +2038,7 @@ class _DesktopPageState extends State<DesktopPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Repository URL input section
+          // Repository URL input section with GitHub button
           Row(
             children: [
               Expanded(
@@ -1608,8 +2077,173 @@ class _DesktopPageState extends State<DesktopPage>
                 ),
                 onPressed: _isProcessingRepo ? null : _processGitRepository,
               ),
+              SizedBox(width: 10),
+              ElevatedButton.icon(
+                icon: Icon(_isLoggedInToGitHub ? Icons.logout : Icons.login),
+                label: Text(
+                  _isLoggedInToGitHub
+                      ? 'GitHub ($_githubUsername)'
+                      : 'GitHub Login',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey.shade800,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                ),
+                onPressed:
+                    _isLoggedInToGitHub
+                        ? _logoutFromGitHub
+                        : _showGitHubLoginDialog,
+              ),
             ],
           ),
+
+          // User repositories section (when logged in)
+          if (_isLoggedInToGitHub && _userRepos.isNotEmpty)
+            Container(
+              margin: EdgeInsets.only(top: 20),
+              padding: EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade800,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Your GitHub Repositories',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  SizedBox(height: 15),
+                  Container(
+                    height: 200,
+                    child: ListView.builder(
+                      itemCount: _userRepos.length,
+                      itemBuilder: (context, index) {
+                        final repo = _userRepos[index];
+                        return ListTile(
+                          title: Row(
+                            children: [
+                              Text(
+                                repo['name'],
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              if (repo['private'] == true)
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade700,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'Private',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
+                              if (repo['isOrg'] == true)
+                                Container(
+                                  margin: EdgeInsets.only(left: 4),
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.purple.shade800,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'Org',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (repo['owner'] != _githubUsername &&
+                                  !repo['isOrg'])
+                                Padding(
+                                  padding: EdgeInsets.only(bottom: 2),
+                                  child: Text(
+                                    'Forked from: ${repo['owner']}',
+                                    style: TextStyle(
+                                      color: Colors.blue.shade300,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              Text(
+                                repo['description'] ?? 'No description',
+                                style: TextStyle(color: Colors.grey.shade400),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.star, color: Colors.amber, size: 16),
+                              Text(
+                                ' ${repo['stars']} ',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              Icon(
+                                Icons.fork_right,
+                                color: Colors.blue,
+                                size: 16,
+                              ),
+                              Text(
+                                ' ${repo['forks']}',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ],
+                          ),
+                          onTap: () => _selectRepository(repo['full_name']),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          if (_isLoggedInToGitHub && _isLoadingRepos)
+            Container(
+              margin: EdgeInsets.only(top: 20),
+              child: Center(
+                child: Column(
+                  children: [
+                    CircularProgressIndicator(color: Colors.white),
+                    SizedBox(height: 10),
+                    Text(
+                      'Loading repositories...',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
           SizedBox(height: 20),
 
@@ -1835,6 +2469,7 @@ class _DesktopPageState extends State<DesktopPage>
                                                 ),
                                       ),
                                     ),
+
                                     // Analysis Tab
                                     Container(
                                       decoration: BoxDecoration(
@@ -2013,6 +2648,16 @@ class _DesktopPageState extends State<DesktopPage>
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
                                     ),
+                                    code: TextStyle(
+                                      color: Colors.lightBlue,
+                                      fontSize: 14,
+                                      backgroundColor: Colors.black38,
+                                    ),
+                                    codeblockPadding: EdgeInsets.all(8),
+                                    codeblockDecoration: BoxDecoration(
+                                      color: Colors.black45,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
                                   ),
                                 )
                                 : Center(
@@ -2045,6 +2690,7 @@ class _DesktopPageState extends State<DesktopPage>
                         style: TextStyle(
                           color: Colors.grey.shade400,
                           fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       SizedBox(height: 10),
@@ -2123,6 +2769,7 @@ class _DesktopPageState extends State<DesktopPage>
               },
             ),
           ),
+
           // Chat Input Section
           Row(
             children: [
