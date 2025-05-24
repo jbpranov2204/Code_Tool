@@ -1,6 +1,6 @@
-# AI-Powered Resume Analyzer
+# Atom - AI Code Analyzer and Reviewer
 
-A smart recruitment platform that leverages Gemini AI API to match candidates' resumes with job requirements. The system evaluates applicants, determines their eligibility, and provides interactive feedback.
+An intelligent development platform that leverages AI to automatically review and debug code. The system boosts development efficiency and provides instant guidance through a conversational AI assistant.
 
 ## 🌐 Live Demo
 
@@ -8,35 +8,34 @@ Try our application: [https://codetool-f919a.web.app/](https://codetool-f919a.we
 
 ## 🔍 Overview
 
-This Flutter application helps streamline the recruitment process by automatically analyzing resumes against job requirements using artificial intelligence. It benefits both recruiters and job seekers by providing objective assessment and immediate feedback.
+This Flutter application helps streamline the software development process by automatically analyzing code quality and identifying potential bugs using artificial intelligence. It benefits developers by providing objective assessment and immediate feedback during code reviews.
 
 ## ⚙️ Features
 
-- 📝 Admin job posting interface
-- 📤 Resume upload module for applicants
-- 🤖 AI-based resume analysis using Gemini API
-- ✅ Eligibility prediction based on job criteria
-- 💬 Intelligent communication with candidates using icons and rich content
+- 📝 Comprehensive code analysis and quality assessment
+- 📤 Code repository integration for automatic reviews
+- 🤖 AI-based bug detection using advanced ML models
+- ✅ Performance optimization suggestions
+- 💬 Intelligent conversational AI assistant for instant coding help
 - 🌐 Web-responsive and mobile-friendly UI
 
 ## 💡 Workflow
 
-1. Admin posts job → enters job title, description, and required skills.
-2. User uploads resume for a specific job.
-3. Gemini API:
-   - Parses the resume.
-   - Compares it with job requirements.
-   - Predicts if the candidate is a good fit.
-4. Eligibility outcome:
-   - Shown using intuitive icons and messages.
-   - Eligible: 🌟 Congratulations! You're shortlisted!
-   - Not Eligible: ❌ Unfortunately, your profile doesn't match.
+1. Developer connects code repository → grants access to the application.
+2. Application:
+   - Analyzes code for quality and potential bugs.
+   - Compares code against best practices and performance benchmarks.
+   - Provides feedback and suggestions for improvement.
+3. Developer receives:
+   - Instant notifications about code issues.
+   - Detailed reports with insights and recommendations.
+   - Suggestions for code optimization and refactoring.
 
 ## 🛠️ Tech Stack
 
 - Flutter (Frontend)
 - Firebase (Backend)
-- Gemini API (Resume Analysis)
+- Gemini API (Code Analysis)
 - Firestore / Cloud Functions (optional)
 - Icons from Material/FontAwesome for visual communication
 
@@ -45,13 +44,13 @@ This Flutter application helps streamline the recruitment process by automatical
 1. Clone the repository
 
    ```
-   git clone https://github.com/yourusername/quiz_app.git
+   git clone https://github.com/jbpranov2204/resume_screening
    ```
 
 2. Navigate to project directory
 
    ```
-   cd quiz_app
+   cd resume_screening
    ```
 
 3. Install dependencies
@@ -85,22 +84,14 @@ flutter build ios --release  # For iOS
 flutter build web --release  # For Web
 ```
 
-## 📊 Visualizations
-
-Our application features advanced data visualizations to help both recruiters and applicants:
-
-- Interactive dashboards showing match percentages
-- Skills gap analysis with visual representations
-- Candidate comparison charts
-- Trend analysis for job market requirements
 
 ## Innovative Solutions
 
-Our AI-powered resume analyzer goes beyond simple keyword matching by:
+Our AI-powered code analyzer goes beyond simple static analysis by:
 
-- Understanding context and relevant experience
-- Evaluating soft skills from resume language
-- Providing personalized feedback to candidates
-- Helping recruiters make data-driven decisions
-- Creating intuitive visual representations of candidate-job fit
+- Understanding code context and structure
+- Identifying anti-patterns and suggesting best practices
+- Providing real-time feedback and code improvement suggestions
+- Helping developers learn and adopt better coding habits
+- Creating intuitive visual representations of code quality
 - Offering actionable insights through comprehensive data visualization
