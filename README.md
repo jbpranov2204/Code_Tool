@@ -14,7 +14,7 @@ This Flutter application helps streamline the software development process by au
 
 - 📝 Comprehensive code analysis and quality assessment
 - 📤 Code repository integration for automatic reviews
-- 🤖 AI-based bug detection using advanced ML models
+- 🤖 AI-based bug detection
 - ✅ Performance optimization suggestions
 - 💬 Intelligent conversational AI assistant for instant coding help
 - 🌐 Web-responsive and mobile-friendly UI
@@ -44,7 +44,7 @@ This Flutter application helps streamline the software development process by au
 1. Clone the repository
 
    ```
-   git clone https://github.com/jbpranov2204/resume_screening
+   git clone https://github.com/jbpranov2204/Code_Tool
    ```
 
 2. Navigate to project directory
