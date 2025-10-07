@@ -25,7 +25,7 @@ class _DesktopPageState extends State<DesktopPage>
   final String selectedAnalysisType =
       'Thoroughly analyze this code for readability, best practices, errors, logic issues, security risks, and performance bottlenecks. Provide detailed improvement recommendations with examples.'; // Comprehensive fixed prompt
   final String _geminiApiKey =
-      'AIzaSyBlbhZsd6sxlQf1FbVZiYN6f3eJY6um1CE'; // Replace with your API key
+      'AIzaSyDeEmDAmZpVuRUJkDooPSpiae3iROw4viY'; // Replace with your API key
 
   bool showQueryField = false; // To toggle the query field
   final TextEditingController queryController = TextEditingController();
@@ -1572,8 +1572,8 @@ class _DesktopPageState extends State<DesktopPage>
                         if (_mobileRepoTabController != null) {
                           DefaultTabController.of(
                             context,
-                          )?.animation?.addListener(() {});
-                          DefaultTabController.of(context)?.index =
+                          ).animation?.addListener(() {});
+                          DefaultTabController.of(context).index =
                               _mobileRepoTabController!.index;
                         }
                         return Column(
@@ -2418,8 +2418,8 @@ class _DesktopPageState extends State<DesktopPage>
                           if (_repoTabController != null) {
                             DefaultTabController.of(
                               context,
-                            )?.animation?.addListener(() {});
-                            DefaultTabController.of(context)?.index =
+                            ).animation?.addListener(() {});
+                            DefaultTabController.of(context).index =
                                 _repoTabController!.index;
                           }
                           return Column(
